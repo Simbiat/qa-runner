@@ -1,0 +1,42 @@
+{
+    "name": "simbiat/qa-runner",
+    "type": "library",
+    "keywords": [
+        "php",
+        "phpstan",
+        "phpcs",
+        "sat",
+        "quality",
+        "phpmd",
+        "fixer",
+        "rector",
+        "psalm"
+    ],
+    "description": "A tool to help combine output of multiple quality tools into one.",
+    "homepage": "https://github.com/Simbiat/qa-runner",
+    "license": "AGPL-3.0-or-later",
+    "authors": [
+        {
+            "name": "Dmitrii Kustov",
+            "email": "support@simbiat.eu",
+            "homepage": "https://www.simbiat.eu",
+            "role": "Developer"
+        }
+    ],
+    "require": {
+        "php": ">=8.5",
+        "symfony/process": "^8.1"
+    },
+    "autoload": {
+        "psr-4": {
+            "Simbiat\\QARunner\\": ""
+        }
+    },
+    "bin": [
+        "bin/qa-runner"
+    ],
+    "support": {
+        "issues": "https://github.com/Simbiat/qa-runner/issues",
+        "source": "https://github.com/Simbiat/qa-runner"
+    }
+}
