@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Interfaces;
 
+use Simbiat\QARunner\Exceptions\ToolFailure;
+use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
@@ -14,20 +16,21 @@ interface DiffableToolAdapter extends ToolAdapter
     /**
      * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
+     * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
-    public function buildDiffProcess(string $paths, string $base_command): Process;
+    public function buildDiffProcess(Paths $paths): Process;
 
     /**
      * Parse the tool output.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param Process $process Symfony's Process instance, that has ended
+     * @param Paths   $paths   Paths to be scanned. Taken from CLI.
      *
      * @return string
+     * @throws ToolFailure If the tool did not run properly
      */
-    public function parseDiff(Process $process, array $paths): string;
+    public function parseDiff(Process $process, Paths $paths): string;
 }

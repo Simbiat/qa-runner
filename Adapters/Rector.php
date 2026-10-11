@@ -6,23 +6,23 @@ namespace Simbiat\QARunner\Adapters;
 
 use ReflectionClass;
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\FixResult;
+use Simbiat\QARunner\Helpers\Cli;
+use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for Rector https://github.com/rectorphp/rector
  */
-final readonly class Rector implements ToolAdapter, DiffableToolAdapter, FixableToolAdapter
+final readonly class Rector extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
     /**
-     * @param string $project_root Path to project root
+     * 0 - nothing to change, 2 - changes needed (dry-run). 1 is a failure of the tool.
      */
-    public function __construct(private string $project_root) {}
+    protected const array OK_EXIT_CODES = [0, 2];
 
-    /** Display label used as Finding::tool, e.g. 'PHP CodeSniffer'. */
+    /** Display label used as Finding::tool. */
     public function name(): string
     {
         return 'Rector';
@@ -31,60 +31,45 @@ final readonly class Rector implements ToolAdapter, DiffableToolAdapter, Fixable
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for regular check by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildCheckProcess(string $paths, string $base_command): Process
+    public function buildCheckProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'rector') === false) {
-            throw new \UnexpectedValueException('Not a Rector command');
-        }
-        // Enforce JSON format
-        $base_command = \preg_replace('/--output-format=\S+/uir', '', $base_command).' --output-format=json';
-        // Force dry-run
-        if (\stripos($base_command, '--dry-run') === false) {
-            $base_command .= ' --dry-run';
-        }
+        $this->assertRector();
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        // Enforce JSON format and dry-run
+        $command = Cli::ensureFlag(Cli::setOption($this->command, '--output-format', 'json'), '--dry-run');
+
+        return $this->shell($command, $paths);
     }
 
-
     /**
-     * Parse the tool output.
+     * Convert the tool output to findings.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
-     *
+     * @return array<Finding>
      * @throws \JsonException
      */
-    public function parseCheck(Process $process, array $paths): array
+    protected function extractFindings(string $output, Paths $paths): array
     {
-        $data = \json_decode($process->getOutput(), true, 512, \JSON_THROW_ON_ERROR);
-        if (!\is_array($data)) {
-            return [];
-        }
-
         $findings = [];
-        foreach ($data['file_diffs'] ?? [] as $file_data) {
+        foreach ($this->decodeJson($output)['file_diffs'] ?? [] as $file_data) {
+            $file = $this->absolute($file_data['file'] ?? '');
             foreach ($file_data['changes'] ?? [] as $finding) {
-                $path = $file_data['file'] ?? '';
-                if ($path !== '' && !\str_starts_with($path, '/')) {
-                    $path = $this->project_root.'/'.$path;
-                }
+                $rector = (string) ($finding['rector'] ?? 'unknown');
                 try {
-                    $description = new ReflectionClass($finding['rector'])->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
+                    $description = (new ReflectionClass($rector))->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
                 } catch (\Throwable) {
                     $description = '';
                 }
                 $findings[] = new Finding(
                     tool: $this->name(),
-                    rule: \substr($finding['rector'], \strrpos($finding['rector'], '\\') + 1),
-                    file: $path,
+                    rule: self::shortName($rector),
+                    file: $file,
                     line: (int) ($finding['line'] ?? 0),
                     message: $description,
                     // Rector has only fixable issues by design
@@ -99,76 +84,46 @@ final readonly class Rector implements ToolAdapter, DiffableToolAdapter, Fixable
     /**
      * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildDiffProcess(string $paths, string $base_command): Process
+    public function buildDiffProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'rector') === false) {
-            throw new \UnexpectedValueException('Not a Rector command');
-        }
-        // Enforce console format with diffs
-        $base_command = \preg_replace('/--output-format=\S+/uir', '', $base_command).' --output-format=console';
-        $base_command = \str_ireplace('--no-diffs', '', $base_command);
-        // Force dry-run
-        if (\stripos($base_command, '--dry-run') === false) {
-            $base_command .= ' --dry-run';
-        }
+        $this->assertRector();
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
-    }
+        // Enforce console format with diffs and force dry-run
+        $command = Cli::setOption(Cli::strip($this->command, ['--no-diffs']), '--output-format', 'console');
 
-    /**
-     * Parse the tool output.
-     *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
-     *
-     * @return string
-     */
-    public function parseDiff(Process $process, array $paths): string
-    {
-        return \trim($process->getOutput());
+        return $this->shell(Cli::ensureFlag($command, '--dry-run'), $paths);
     }
 
     /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be processed. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildFixProcess(string $paths, string $base_command): Process
+    public function buildFixProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'rector') === false) {
-            throw new \UnexpectedValueException('Not a Rector command');
-        }
-        // Enforce console format with diffs and remove dry-run
-        $base_command = \preg_replace('/--output-format=\S+/uir', '', $base_command).' --output-format=console';
-        $base_command = \str_ireplace(['--no-diffs', '--dry-run'], '', $base_command);
+        $this->assertRector();
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        // Enforce console format with diffs and remove dry-run
+        $command = Cli::setOption(Cli::strip($this->command, ['--no-diffs', '--dry-run']), '--output-format', 'console');
+
+        return $this->shell($command, $paths);
     }
 
     /**
-     * Parse the tool output.
+     * Make sure the command is for Rector.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
-     *
-     * @return \Simbiat\QARunner\Entities\FixResult
+     * @throws \UnexpectedValueException
      */
-    public function parseFix(Process $process, array $paths): FixResult
+    private function assertRector(): void
     {
-        $code = $process->getExitCode();
-
-        return new FixResult(
-            tool: $this->name(),
-            success: $code === 0,
-            output: \trim($process->getOutput()."\n".$process->getErrorOutput()),
-        );
+        if (!Cli::mentions($this->command, 'rector')) {
+            throw new \UnexpectedValueException('Not a Rector command');
+        }
     }
 }

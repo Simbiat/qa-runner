@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Commands;
 
 use Simbiat\QARunner\Entities\FixResult;
-use Simbiat\QARunner\Helpers\PathEscaper;
+use Simbiat\QARunner\Helpers\FailureMessage;
+use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
 
 /**
  * Runner for Fix command
@@ -15,33 +15,35 @@ use Simbiat\QARunner\Interfaces\ToolAdapter;
 final readonly class Fix
 {
     /**
-     * @param array<string, ToolAdapter> $adapters List of adapters to use
-     * @param array<string, string>      $commands Commands to run
+     * @param array<string, FixableToolAdapter> $adapters List of adapters to use
+     * @param float|null                        $timeout  Timeout in seconds for each tool. Null means no timeout.
      */
     public function __construct(
-        private array $adapters,
-        private array $commands,
+        private array  $adapters,
+        private ?float $timeout = null,
     ) {}
 
     /**
      * Apply fixes. Deliberately sequential: fixers rewrite the real file, and two of them rewriting the same file at once can corrupt it.
+     * A tool, that fails to run, gives an unsuccessful result, and the next tool still runs. If the process was created, the result has the full command line.
      *
-     * @param array<string> $paths Paths to process
+     * @param Paths $paths Paths to process
      *
      * @return list<FixResult> Results of all the commands, that were ran
      */
-    public function run(array $paths): array
+    public function run(Paths $paths): array
     {
         $results = [];
-        foreach ($this->adapters as $class => $adapter) {
-            if (!$adapter instanceof FixableToolAdapter) {
-                continue;
+        foreach ($this->adapters as $adapter) {
+            $process = null;
+            try {
+                $process = $adapter->buildFixProcess($paths);
+                $process->setTimeout($this->timeout);
+                $process->run();
+                $results[] = $adapter->parseFix($process, $paths);
+            } catch (\Throwable $exception) {
+                $results[] = new FixResult($adapter->name(), false, $process === null ? $exception->getMessage() : FailureMessage::forRun($process, $exception));
             }
-
-            $process = $adapter->buildFixProcess(PathEscaper::escapedPaths($paths), $this->commands[$class]);
-            $process->setTimeout(null);
-            $process->run();
-            $results[] = $adapter->parseFix($process, $paths);
         }
 
         return $results;

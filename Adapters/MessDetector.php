@@ -5,20 +5,22 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
+use Simbiat\QARunner\Entities\Severity;
+use Simbiat\QARunner\Helpers\Cli;
+use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for PHP Mess Detector https://github.com/phpmd/phpmd
  */
-final readonly class MessDetector implements ToolAdapter
+final readonly class MessDetector extends AbstractAdapter
 {
     /**
-     * @param string $project_root Path to project root
+     * 0 - nothing found, 2 - violations found. 1 is an exception inside the tool. 3 can be ambiguous, because it can be mean that one of the files was not processed properly.
      */
-    public function __construct(private string $project_root) {}
+    protected const array OK_EXIT_CODES = [0, 2];
 
-    /** Display label used as Finding::tool, e.g. 'PHP CodeSniffer'. */
+    /** Display label used as Finding::tool. */
     public function name(): string
     {
         return 'PHP Mess Detector';
@@ -27,52 +29,54 @@ final readonly class MessDetector implements ToolAdapter
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for regular check by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildCheckProcess(string $paths, string $base_command): Process
+    public function buildCheckProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'phpmd analyze') === false) {
+        if (!Cli::mentions($this->command, 'phpmd analyze')) {
             throw new \UnexpectedValueException('Not a PHPMD command');
         }
-        // Enforce JSON format
-        $base_command = \preg_replace('/--format=\S+/uir', '', $base_command).' --format=json';
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        // Enforce JSON format
+        return $this->shell(Cli::setOption($this->command, '--format', 'json'), $paths);
     }
 
-
     /**
-     * Parse the tool output.
+     * Convert the tool output to findings.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
-     *
+     * @return array<Finding>
      * @throws \JsonException
      */
-    public function parseCheck(Process $process, array $paths): array
+    protected function extractFindings(string $output, Paths $paths): array
     {
-        $data = \json_decode($process->getOutput(), true, 512, \JSON_THROW_ON_ERROR);
-        if (!\is_array($data)) {
-            return [];
-        }
-
+        $data = $this->decodeJson($output);
         $findings = [];
         foreach ($data['files'] ?? [] as $file_data) {
             foreach ($file_data['violations'] ?? [] as $message) {
                 $findings[] = new Finding(
                     tool: $this->name(),
                     rule: $message['rule'] ?? 'unknown',
-                    file: $file_data['file'],
+                    file: $file_data['file'] ?? '',
                     line: (int) ($message['beginLine'] ?? 0),
                     message: $message['description'] ?? '',
                     fixable: (bool) ($message['fixable'] ?? false),
                 );
             }
+        }
+        // Files, that PHPMD could not process (for example, because of syntax errors)
+        foreach ($data['errors'] ?? [] as $error) {
+            $findings[] = new Finding(
+                tool: $this->name(),
+                rule: 'processing-error',
+                file: $error['fileName'] ?? '',
+                message: $error['message'] ?? '',
+                type: Severity::ERROR,
+            );
         }
 
         return $findings;

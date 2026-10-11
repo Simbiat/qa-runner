@@ -14,9 +14,9 @@ interface OutputFormatter
     /**
      * Main function to prepare the output
      *
-     * @param array<Finding> $findings List of found issues
+     * @param array<Finding> $findings List of found issues. Already sorted by the caller, so formatters must keep the order.
      *
-     * @return string
+     * @return string Output without a trailing line break. Empty string if there is nothing to show.
      */
     public function format(array $findings): string;
 }

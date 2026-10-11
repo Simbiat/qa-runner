@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Interfaces;
 
 use Simbiat\QARunner\Entities\FixResult;
+use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
@@ -15,20 +16,20 @@ interface FixableToolAdapter extends ToolAdapter
     /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be processed. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
+     * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
-    public function buildFixProcess(string $paths, string $base_command): Process;
+    public function buildFixProcess(Paths $paths): Process;
 
     /**
      * Parse the tool output.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param Process $process Symfony's Process instance, that has ended
+     * @param Paths   $paths   Paths to be processed. Taken from CLI.
      *
-     * @return \Simbiat\QARunner\Entities\FixResult
+     * @return FixResult
      */
-    public function parseFix(Process $process, array $paths): FixResult;
+    public function parseFix(Process $process, Paths $paths): FixResult;
 }

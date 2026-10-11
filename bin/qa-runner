@@ -1,120 +1,19 @@
 #!/usr/bin/env php
 <?php
 
+// phpcs:ignoreFile Symfony.Files.AlphanumericFilename.Invalid
+
 declare(strict_types=1);
 
-require $_composer_autoload_path ?? (__DIR__.'/../vendor/autoload.php');
+/** @noinspection SuspiciousBinaryOperationInspection */
+require $_composer_autoload_path ?? __DIR__.'/../vendor/autoload.php';
 
-use Simbiat\QARunner\Commands\Check;
-use Simbiat\QARunner\Commands\Diff;
-use Simbiat\QARunner\Commands\Fix;
-use Simbiat\QARunner\Formatters\Console;
-use Simbiat\QARunner\Formatters\IDE;
-use Simbiat\QARunner\Helpers\Config;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
-
-$mode = $argv[1] ?? null;
-if (!in_array($mode, ['check', 'diff', 'fix'], true)) {
-    fwrite(STDERR, "Usage: qa-runner <check|diff|fix> [--project=DIR] [--format=NAME] <file> [<file> ...]\n");
-    exit(2);
-}
-
-$project = getcwd();
-$format = 'ide';
-$color = false;
-$by_type = false;
-$full_scan = true;
-$paths = [];
-foreach (array_slice($argv, 2) as $arg) {
-    if (str_starts_with($arg, '--project=')) {
-        $project = substr($arg, strlen('--project='));
-    } elseif (str_starts_with($arg, '--format=')) {
-        $format = substr($arg, strlen('--format='));
-    } elseif (str_starts_with($arg, '--color')) {
-        $color = true;
-    } elseif (str_starts_with($arg, '--by-type')) {
-        $by_type = true;
-    } elseif (str_starts_with($arg, '--no-full-scan')) {
-        $full_scan = true;
-    } else {
-        $paths[] = $arg;
-    }
-}
-
-$project = realpath((string) $project);
-if ($project === false || !is_dir($project)) {
-    fwrite(STDERR, "Not a readable project directory.\n");
-    exit(2);
-}
-
-if ($paths === []) {
-    fwrite(STDERR, "No paths given.\n");
-    exit(2);
-}
+use Simbiat\QARunner\Console\Application;
 
 try {
-    foreach ($paths as $path) {
-        if (!is_readable($path)) {
-            throw new RuntimeException("Not a readable path: $path");
-        }
-    }
-} catch (RuntimeException $exception) {
-    fwrite(STDERR, $exception->getMessage()."\n");
+    exit(new Application()->run());
+    // phpcs:ignore SlevomatCodingStandard.Namespaces.FullyQualifiedExceptions.NonFullyQualifiedException
+} catch (Throwable $throwable) {
+    echo "Failed to run QA Runner tests.\n".$throwable->getMessage()."\n".$throwable->getTraceAsString()."\n";
     exit(2);
-}
-
-$formatters = [
-    'ide' => new IDE($by_type),
-    'console' => new Console($color, $by_type),
-];
-if (!isset($formatters[$format])) {
-    fwrite(STDERR, "Unknown format '$format'. Available: ".implode(', ', array_keys($formatters))."\n");
-    exit(2);
-}
-$formatter = $formatters[$format];
-
-try {
-    $config = Config::fromProjectRoot($project);
-} catch (JsonException) {
-    fwrite(STDERR, "Failed to parse `composer.json`.\n");
-    exit(2);
-}
-
-$commands = $config->commandsFor($mode);
-$adapters = [];
-foreach ($commands as $class => $settings) {
-    if (!is_a($class, ToolAdapter::class, true)) {
-        fwrite(STDERR, "qa-runner: '$class' is not a known ToolAdapter, skipping.\n");
-        continue;
-    }
-    /** @var string $class -- False positive from EA Inspections, despite the proper hinting in the method */
-    $adapters[$class] = new $class($project, $full_scan);
-}
-if (count($adapters) === 0) {
-    fwrite(STDERR, "No adapters found. Check the settings in `composer.json`.\n");
-    exit(2);
-}
-
-switch ($mode) {
-    case 'check':
-        $findings = new Check($adapters, $commands)->run($paths);
-        echo $formatter->format($findings)."\n";
-        exit($findings === [] ? 0 : 1);
-    case 'diff':
-        $diffs = new Diff($adapters, $commands)->run($paths);
-        foreach ($diffs as $tool => $diff) {
-            echo "========= Start of $tool output =========\n\n$diff\n\n========= End of $tool output =========\n";
-        }
-        exit($diffs === [] ? 0 : 1);
-    case 'fix':
-        $results = new Fix($adapters, $commands)->run($paths);
-        $failed = false;
-        foreach ($results as $iteration => $result) {
-            echo ($iteration > 0 ? "\n\n" : '')."========= Start of $result->tool output =========\n\n";
-            echo $result->output !== '' ? $result->output."\n\n" : '';
-            echo "========= End of $result->tool output =========";
-            $failed = $failed || !$result->success;
-        }
-        echo "\n";
-        exit($failed ? 1 : 0);
 }

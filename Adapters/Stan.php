@@ -5,21 +5,22 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
+use Simbiat\QARunner\Entities\Severity;
+use Simbiat\QARunner\Helpers\Cli;
+use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for PHPStan https://github.com/phpstan/phpstan
  */
-final readonly class Stan implements ToolAdapter
+final readonly class Stan extends AbstractAdapter
 {
     /**
-     * @param string $project_root Path to project root
-     * @param bool   $full_scan    Whether to scan the full project or just the provided path
+     * 0 - no errors, 1 - errors found. Anything else is a failure of the tool.
      */
-    public function __construct(private string $project_root, private bool $full_scan) {}
+    protected const array OK_EXIT_CODES = [0, 1];
 
-    /** Display label used as Finding::tool, e.g. 'PHP CodeSniffer'. */
+    /** Display label used as Finding::tool. */
     public function name(): string
     {
         return 'PHPStan';
@@ -28,57 +29,58 @@ final readonly class Stan implements ToolAdapter
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for regular check by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildCheckProcess(string $paths, string $base_command): Process
+    public function buildCheckProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'phpstan analyse') === false) {
+        if (\preg_match('/phpstan\s+analy[sz]e/i', $this->command) !== 1) {
             throw new \UnexpectedValueException('Not a PHPStan\'s analyse command');
         }
+        // String --quiet flag, because it will hide the output
+        $command = Cli::strip($this->command, ['--quiet', '-q']);
+
         // Enforce JSON format
-        $base_command = \preg_replace('/--error-format=\S+/uir', '', $base_command).' --error-format=json';
-
-        if ($this->full_scan) {
-            return Process::fromShellCommandline($base_command, $this->project_root);
-        }
-
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        return $this->shell(Cli::setOption($command, '--error-format', 'json'), $this->full_scan ? null : $paths);
     }
 
     /**
-     * Parse the tool output.
+     * Convert the tool output to findings. Only the findings in the requested paths are kept.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
-     *
+     * @return array<Finding>
      * @throws \JsonException
      */
-    public function parseCheck(Process $process, array $paths): array
+    protected function extractFindings(string $output, Paths $paths): array
     {
-        $data = \json_decode($process->getOutput(), true, 512, \JSON_THROW_ON_ERROR);
-        if (!\is_array($data)) {
-            return [];
-        }
-        $wanted = \array_flip($paths);
+        $data = $this->decodeJson($output);
         $findings = [];
         foreach ($data['files'] ?? [] as $file => $file_data) {
-            if (!isset($wanted[$file])) {
+            if (!$paths->covers((string) $file)) {
                 continue;
             }
             foreach ($file_data['messages'] ?? [] as $message) {
                 $findings[] = new Finding(
                     tool: $this->name(),
                     rule: $message['identifier'] ?? 'unknown',
-                    file: $file,
+                    file: (string) $file,
                     line: (int) ($message['line'] ?? 0),
                     message: $message['message'] ?? '',
                 );
             }
+        }
+        // Errors, that are not tied to a file (for example, a bad configuration or an ignore pattern, that did not match). They are attached to the project root.
+        foreach ($data['errors'] ?? [] as $error) {
+            $findings[] = new Finding(
+                tool: $this->name(),
+                rule: 'general',
+                file: $this->project_root,
+                message: (string) $error,
+                type: Severity::ERROR,
+            );
         }
 
         return $findings;

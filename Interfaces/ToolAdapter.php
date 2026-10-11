@@ -4,10 +4,14 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Interfaces;
 
+use Simbiat\QARunner\Entities\Finding;
+use Simbiat\QARunner\Exceptions\ToolFailure;
+use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
- * Interface for tools to allow plugging them into the Runner
+ * Interface for tools to allow plugging them into the Runner.
+ * The runner creates adapters as `new Adapter(string $project_root, string $command, bool $full_scan, ?string $bin_dir)`. Extend `AbstractAdapter` to get this constructor.
  */
 interface ToolAdapter
 {
@@ -17,20 +21,21 @@ interface ToolAdapter
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for regular check by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
+     * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
-    public function buildCheckProcess(string $paths, string $base_command): Process;
+    public function buildCheckProcess(Paths $paths): Process;
 
     /**
      * Parse the tool output.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param Process $process Symfony's Process instance, that has ended
+     * @param Paths   $paths   Paths to be scanned. Taken from CLI.
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
+     * @return array<Finding>
+     * @throws ToolFailure If the tool did not run properly
      */
-    public function parseCheck(Process $process, array $paths): array;
+    public function parseCheck(Process $process, Paths $paths): array;
 }

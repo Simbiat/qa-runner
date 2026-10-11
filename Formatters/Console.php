@@ -5,33 +5,29 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Formatters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Helpers\Sorter;
+use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
+use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 
 /**
- * A prettier and more human-readable format for the console with optional colors and 2 ways to sort things
+ * A prettier and more human-readable format for the console with optional colors and 2 ways to group things
  */
-final class Console implements OutputFormatter
+final readonly class Console implements OutputFormatter
 {
     /**
-     * Color value for reset
-     */
-    private const string RESET = "\033[0m";
-
-    /**
-     * List of values for colors based on finding type
+     * Colors by finding type (names of Symfony Console colors)
      */
     private const array COLORS = [
-        'ERROR' => "\033[31m",
-        'WARNING' => "\033[33m",
-        'NOTICE' => "\033[36m",
+        'ERROR' => 'red',
+        'WARNING' => 'yellow',
+        'NOTICE' => 'cyan',
     ];
 
     /**
-     * @param bool $colors  Whether to color the output
-     * @param bool $by_rule Whether sorting by rule should be used
+     * @param bool $colors  Whether to color the output (pass `$output->isDecorated()`, so `--ansi`, `--no-ansi`, `NO_COLOR` and TTY detection work)
+     * @param bool $by_rule Whether grouping by tool, type and rule should be used (the findings must be sorted accordingly) instead of grouping by file
      */
-    public function __construct(private readonly bool $colors = true, private readonly bool $by_rule = false) {}
+    public function __construct(private bool $colors = true, private bool $by_rule = false) {}
 
     /**
      * Main function to prepare the output
@@ -42,42 +38,29 @@ final class Console implements OutputFormatter
      */
     public function format(array $findings): string
     {
-        if ($findings === []) {
-            return '';
-        }
-
-        $findings = $this->by_rule
-            ? Sorter::sortByType($findings)
-            : Sorter::sortByFile($findings);
-
         $lines = [];
         $notch_outer = null;
         $notch_bucket = null;
         $notch_rule = null;
 
         foreach ($findings as $finding) {
-            $type = \strtoupper($finding->type);
-
-            if (($this->by_rule ? $finding->tool : $finding->file) !== $notch_outer) {
+            $outer = $this->by_rule ? $finding->tool : $finding->file;
+            if ($outer !== $notch_outer) {
                 if ($notch_outer !== null) {
                     $lines[] = '';
                 }
-                $notch_outer = $this->by_rule ? $finding->tool : $finding->file;
+                $notch_outer = $outer;
                 $notch_bucket = null;
                 $notch_rule = null;
-                $lines[] = $notch_outer.':';
+                $lines[] = $outer.':';
             }
 
             if ($this->by_rule) {
-                $bucket = ($finding->fixable ? 'Fixable ' : '').$type;
+                $bucket = ($finding->fixable ? 'Fixable ' : '').$finding->type->value;
                 if ($bucket !== $notch_bucket) {
                     $notch_bucket = $bucket;
                     $notch_rule = null;
-                    $header = "\t".$bucket.':';
-                    if ($this->colors && isset(self::COLORS[$type])) {
-                        $header = self::COLORS[$type].$header.self::RESET;
-                    }
-                    $lines[] = $header;
+                    $lines[] = $this->color("\t".$bucket.':', $finding->type);
                 }
 
                 if ($finding->rule !== $notch_rule) {
@@ -85,23 +68,13 @@ final class Console implements OutputFormatter
                     $lines[] = "\t\t".$notch_rule.':';
                 }
 
-                $lines[] = \sprintf(
-                    "\t\t\t%s:%d:%d: %s",
-                    $finding->file,
-                    $finding->line,
-                    $finding->column,
-                    $finding->message,
-                );
+                $lines[] = \sprintf("\t\t\t%s:%d:%d: %s", $finding->file, $finding->line, $finding->column, $finding->message);
             } else {
-                $tag = \sprintf('[%s%s%s]', $finding->tool.', ', $finding->fixable ? 'Fixable ' : '', $type);
-                if ($this->colors && isset(self::COLORS[$type])) {
-                    $tag = self::COLORS[$type].$tag.self::RESET;
-                }
                 $lines[] = \sprintf(
                     "\t%d:%d: %s %s (%s)",
                     $finding->line,
                     $finding->column,
-                    $tag,
+                    $this->color(\sprintf('[%s, %s%s]', $finding->tool, $finding->fixable ? 'Fixable ' : '', $finding->type->value), $finding->type),
                     $finding->message,
                     $finding->rule,
                 );
@@ -109,5 +82,18 @@ final class Console implements OutputFormatter
         }
 
         return \implode(\PHP_EOL, $lines);
+    }
+
+    /**
+     * Color the text, if colors are enabled.
+     *
+     * @param string   $text Text to color
+     * @param Severity $type Type of finding, that decides the color
+     *
+     * @return string
+     */
+    private function color(string $text, Severity $type): string
+    {
+        return $this->colors ? new OutputFormatterStyle(self::COLORS[$type->value])->apply($text) : $text;
     }
 }

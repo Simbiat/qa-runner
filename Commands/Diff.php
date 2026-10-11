@@ -4,54 +4,30 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Commands;
 
-use Simbiat\QARunner\Helpers\PathEscaper;
+use Simbiat\QARunner\Entities\RunResult;
+use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
+use Symfony\Component\Process\Process;
 
 /**
  * Runner for Diff command
  */
-final readonly class Diff
+final readonly class Diff extends AbstractCommand
 {
     /**
-     * @param array<string, ToolAdapter> $adapters List of adapters to use
-     * @param array<string, string>      $commands Commands to run
-     */
-    public function __construct(
-        private array $adapters,
-        private array $commands,
-    ) {}
-
-    /**
-     * Get dry-run diff report from tools that support them.
+     * Get dry-run diff report from tools that support them. The tools run in parallel (safe, since they only read).
      *
-     * @param array<string> $paths Paths to process
+     * @param Paths $paths Paths to process
      *
-     * @return array<string, string> Results of all the commands, that were ran
+     * @return RunResult `items` is a map of tool name => diff (tools without a diff are not included), `failures` lists the tools, that did not run properly
      */
-    public function run(array $paths): array
+    public function run(Paths $paths): RunResult
     {
-        $running = [];
-        foreach ($this->adapters as $class => $adapter) {
-            if (!$adapter instanceof DiffableToolAdapter) {
-                continue;
-            }
+        $result = $this->runParallel(
+            static fn(DiffableToolAdapter $adapter): Process => $adapter->buildDiffProcess($paths),
+            static fn(DiffableToolAdapter $adapter, Process $process): string => $adapter->parseDiff($process, $paths),
+        );
 
-            $process = $adapter->buildDiffProcess(PathEscaper::escapedPaths($paths), $this->commands[$class]);
-            $process->setTimeout(null);
-            $process->start();
-            $running[] = [$adapter, $process];
-        }
-
-        $diffs = [];
-        foreach ($running as [$adapter, $process]) {
-            $process->wait();
-            $diff = $adapter->parseDiff($process, $paths);
-            if ($diff !== '') {
-                $diffs[$adapter->name()] = $diff;
-            }
-        }
-
-        return $diffs;
+        return new RunResult(\array_filter($result->items, static fn(string $diff): bool => $diff !== ''), $result->failures);
     }
 }

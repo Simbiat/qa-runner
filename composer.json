@@ -25,6 +25,8 @@
     ],
     "require": {
         "php": ">=8.5",
+        "ext-mbstring": "*",
+        "symfony/console": "^8.1",
         "symfony/process": "^8.1"
     },
     "autoload": {

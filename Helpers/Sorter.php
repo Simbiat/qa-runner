@@ -4,13 +4,15 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Helpers;
 
+use Simbiat\QARunner\Entities\Finding;
+
 /**
  * Sorts Finding arrays.
  */
 final class Sorter
 {
     /**
-     * Sort findings by file path, line and column.
+     * Sort findings by file path, line, column and fixability (fixable first).
      *
      * @param array<array-key, \Simbiat\QARunner\Entities\Finding> $findings List of findings
      *
@@ -19,13 +21,13 @@ final class Sorter
     public static function sortByFile(array $findings): array
     {
         $sorted = \array_values($findings);
-        \usort($sorted, static fn($a, $b) => self::compareByFile($a, $b));
+        \usort($sorted, static fn(Finding $a, Finding $b): int => self::compareByFile($a, $b));
 
         return $sorted;
     }
 
     /**
-     * Sort findings by tool, fixability, rule, file, line and column.
+     * Sort findings by tool, fixability, type, rule, file, line and column.
      *
      * @param array<array-key, \Simbiat\QARunner\Entities\Finding> $findings List of findings
      *
@@ -34,40 +36,42 @@ final class Sorter
     public static function sortByType(array $findings): array
     {
         $sorted = \array_values($findings);
-        \usort($sorted, static fn($a, $b) => self::compareByType($a, $b));
+        \usort($sorted, static fn(Finding $a, Finding $b): int => self::compareByType($a, $b));
 
         return $sorted;
     }
 
     /**
-     * Sort findings by file path, line and column.
+     * Compare by file path, line, column and fixability.
      *
-     * @param object $a Object to compare
-     * @param object $b Object to compare
+     * @param Finding $a Finding to compare
+     * @param Finding $b Finding to compare
      *
      * @return int
      */
-    private static function compareByFile(object $a, object $b): int
+    private static function compareByFile(Finding $a, Finding $b): int
     {
         return \strnatcasecmp($a->file, $b->file)
             ?: ($a->line <=> $b->line)
-                ?: ($a->column <=> $b->column);
+                ?: ($a->column <=> $b->column)
+                    // Fixable is boolean, so need to "reverse" the order
+                    ?: ($b->fixable <=> $a->fixable);
     }
 
     /**
-     * Sort findings by tool, fixability, type, rule, file, line and column.
+     * Compare by tool, fixability, type, rule, file, line and column.
      *
-     * @param object $a Object to compare
-     * @param object $b Object to compare
+     * @param Finding $a Finding to compare
+     * @param Finding $b Finding to compare
      *
      * @return int
      */
-    private static function compareByType(object $a, object $b): int
+    private static function compareByType(Finding $a, Finding $b): int
     {
         return \strnatcasecmp($a->tool, $b->tool)
             // Fixable is boolean, so need to "reverse" the order
             ?: ($b->fixable <=> $a->fixable)
-                ?: \strnatcasecmp($a->type, $b->type)
+                ?: \strnatcasecmp($a->type->value, $b->type->value)
                     ?: \strnatcasecmp($a->rule, $b->rule)
                         ?: \strnatcasecmp($a->file, $b->file)
                             ?: ($a->line <=> $b->line)

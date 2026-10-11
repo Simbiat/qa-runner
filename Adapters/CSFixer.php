@@ -5,23 +5,23 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\FixResult;
+use Simbiat\QARunner\Helpers\Cli;
+use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
-use Simbiat\QARunner\Interfaces\ToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for PHP CS Fixer https://github.com/PHP-CS-Fixer/PHP-CS-Fixer
  */
-final readonly class CSFixer implements ToolAdapter, DiffableToolAdapter, FixableToolAdapter
+final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
     /**
-     * @param string $project_root Path to project root
+     * 0 - nothing to change, 8 - changes needed (dry-run). Other codes are errors: 4 - invalid files, 16 - configuration error, 32 - exception in a fixer.
      */
-    public function __construct(private string $project_root) {}
+    protected const array OK_EXIT_CODES = [0, 8];
 
-    /** Display label used as Finding::tool, e.g. 'PHP CodeSniffer'. */
+    /** Display label used as Finding::tool. */
     public function name(): string
     {
         return 'PHP CS Fixer';
@@ -30,68 +30,47 @@ final readonly class CSFixer implements ToolAdapter, DiffableToolAdapter, Fixabl
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for regular check by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildCheckProcess(string $paths, string $base_command): Process
+    public function buildCheckProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'php-cs-fixer check') === false && (\stripos($base_command, 'php-cs-fixer fix') === false || \stripos($base_command, '--dry-run') === false)) {
-            throw new \UnexpectedValueException('Not a CS Fixer dry-run command');
-        }
+        $this->assertDryRun();
+
         // Enforce Gitlab format, since it is JSON and provide description of the rules
-        $base_command = \preg_replace('/--format=\S+/uir', '', $base_command).' --format=gitlab';
+        $command = Cli::setOption($this->command, '--format', 'gitlab');
         // Force --diff, since this also adds lines values.
         // They seem to be wrong in most cases, and there were multiple issues and PRs related to this with no proper resolution, but maybe at some point it will be properly fixed.
-        if (\stripos($base_command, '--diff') === false) {
-            $base_command .= ' --diff';
-        }
+        $command = Cli::ensureFlag($command, '--diff');
         // Force --verbose flag to get rules' names
-        if (\stripos($base_command, '--verbose') === false) {
-            $base_command .= ' --verbose';
-        }
-        // Force dry-run
-        if (\stripos($base_command, '--dry-run') === false) {
-            $base_command .= ' --dry-run';
-        }
-        // Remove --stop-on-violation ifp resent, since the goal is to get the whole list
-        $base_command = \str_ireplace('--stop-on-violation', '', $base_command);
+        $command = Cli::ensureFlag($command, '--verbose', ['-v', '-vv', '-vvv']);
+        // Remove --stop-on-violation if present, since the goal is to get the whole list
+        $command = Cli::strip($command, ['--stop-on-violation']);
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        return $this->shell($this->withDryRun($command), $paths);
     }
 
     /**
-     * Parse the tool output.
+     * Convert the tool output to findings.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
-     *
+     * @return array<Finding>
      * @throws \JsonException
      */
-    public function parseCheck(Process $process, array $paths): array
+    protected function extractFindings(string $output, Paths $paths): array
     {
-        $data = \json_decode($process->getOutput(), true, 512, \JSON_THROW_ON_ERROR);
-        if (!\is_array($data)) {
-            return [];
-        }
-
         $findings = [];
-        foreach ($data as $finding) {
-            $path = $finding['location']['path'] ?? '';
-            if ($path !== '' && !\str_starts_with($path, '/')) {
-                $path = $this->project_root.'/'.$path;
-            }
-
+        foreach ($this->decodeJson($output) as $finding) {
             $findings[] = new Finding(
                 tool: $this->name(),
                 // Strip the prefix
-                rule: \str_ireplace('PHP-CS-Fixer.', '', $finding['check_name']),
-                file: $path,
-                line: $finding['location']['lines']['begin'] ?? 0,
-                message: $finding['description'],
+                rule: \str_ireplace('PHP-CS-Fixer.', '', $finding['check_name'] ?? 'unknown'),
+                file: $this->absolute($finding['location']['path'] ?? ''),
+                line: (int) ($finding['location']['lines']['begin'] ?? 0),
+                message: $finding['description'] ?? '',
                 fixable: true,
             );
         }
@@ -102,78 +81,58 @@ final readonly class CSFixer implements ToolAdapter, DiffableToolAdapter, Fixabl
     /**
      * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildDiffProcess(string $paths, string $base_command): Process
+    public function buildDiffProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'php-cs-fixer check') === false && (\stripos($base_command, 'php-cs-fixer fix') === false || \stripos($base_command, '--dry-run') === false)) {
-            throw new \UnexpectedValueException('Not a CS Fixer dry-run command');
-        }
-        // Enforce text format
-        $base_command = \preg_replace('/--format=\S+/uir', '', $base_command).' --format=txt';
-        // Force dry-run
-        if (\stripos($base_command, '--dry-run') === false) {
-            $base_command .= ' --dry-run';
-        }
-        // Force --diff mode
-        if (\stripos($base_command, '--diff') === false) {
-            $base_command .= ' --diff';
-        }
+        $this->assertDryRun();
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
-    }
+        // Enforce text format and diff mode
+        $command = Cli::ensureFlag(Cli::setOption($this->command, '--format', 'txt'), '--diff');
 
-    /**
-     * Parse the tool output.
-     *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
-     *
-     * @return string
-     */
-    public function parseDiff(Process $process, array $paths): string
-    {
-        return \trim($process->getOutput());
+        return $this->shell($this->withDryRun($command), $paths);
     }
 
     /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
-     * @param string $paths        Paths to be scanned. Taken from CLI and escaped.
-     * @param string $base_command Command for Diff by the tool. Taken from composer.json.
+     * @param Paths $paths Paths to be processed. Taken from CLI.
      *
-     * @return \Symfony\Component\Process\Process
+     * @return Process
      */
-    public function buildFixProcess(string $paths, string $base_command): Process
+    public function buildFixProcess(Paths $paths): Process
     {
-        if (\stripos($base_command, 'php-cs-fixer fix') === false) {
+        if (!Cli::mentions($this->command, 'php-cs-fixer fix')) {
             throw new \UnexpectedValueException('Not a CS Fixer fix command');
         }
-        // Remove --dry-run flag
-        $base_command = \str_ireplace('--dry-run', '', $base_command);
 
-        return Process::fromShellCommandline($base_command.$paths, $this->project_root);
+        // Remove --dry-run flag
+        return $this->shell(Cli::strip($this->command, ['--dry-run']), $paths);
     }
 
     /**
-     * Parse the tool output.
+     * Make sure the command is a dry-run one: either `check`, or `fix` with `--dry-run`.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance
-     * @param array<string>                      $paths   Paths to be scanned. Taken from CLI.
-     *
-     * @return \Simbiat\QARunner\Entities\FixResult
+     * @throws \UnexpectedValueException
      */
-    public function parseFix(Process $process, array $paths): FixResult
+    private function assertDryRun(): void
     {
-        $code = $process->getExitCode();
+        if (!Cli::mentions($this->command, 'php-cs-fixer check') && !(Cli::mentions($this->command, 'php-cs-fixer fix') && Cli::has($this->command, ['--dry-run']))) {
+            throw new \UnexpectedValueException('Not a CS Fixer dry-run command');
+        }
+    }
 
-        return new FixResult(
-            tool: $this->name(),
-            success: $code === 0,
-            output: \trim($process->getOutput()."\n".$process->getErrorOutput()),
-        );
+    /**
+     * Force dry-run for the `fix` command. The `check` command is dry-run by definition.
+     *
+     * @param string $command Command line
+     *
+     * @return string
+     */
+    private function withDryRun(string $command): string
+    {
+        return Cli::mentions($command, 'php-cs-fixer fix') ? Cli::ensureFlag($command, '--dry-run') : $command;
     }
 }
