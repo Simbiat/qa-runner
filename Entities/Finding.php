@@ -5,17 +5,25 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Entities;
 
 /**
- * Shape of QA tool finding objects
+ * Shape of QA tool finding objects.
  */
 final readonly class Finding
 {
-    /** @var int Line, where the finding is. Always 1 or more. */
+    /**
+     * @var int Line, where the finding is. Always 1 or more.
+     */
     public int $line;
-    /** @var int Column, where the finding is. Always 1 or more. */
+    /**
+     * @var int Column, where the finding is. Always 1 or more.
+     */
     public int $column;
-    /** @var string Finding description, always on a single line. */
+    /**
+     * @var string Finding description, always on a single line.
+     */
     public string $message;
-    /** @var Severity Type of finding. */
+    /**
+     * @var Severity Type of finding.
+     */
     public Severity $type;
 
     /**

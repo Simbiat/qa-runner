@@ -13,7 +13,7 @@ use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for Psalm https://github.com/vimeo/psalm/
+ * Adapter for Psalm https://github.com/vimeo/psalm/.
  */
 final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
@@ -23,7 +23,7 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
     protected const array OK_EXIT_CODES = [0, 2];
 
     /**
-     * Fixable errors' types, taken from https://psalm.dev/docs/manipulating_code/fixing/
+     * Fixable errors' types, taken from https://psalm.dev/docs/manipulating_code/fixing/.
      */
     private const array FIXABLE_ERRORS = [
         'MissingReturnType',
@@ -47,7 +47,9 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
         'ParamNameMismatch',
     ];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'Psalm';
@@ -70,38 +72,6 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
         $command = Cli::setOption(Cli::strip($this->command, ['--taint-analysis', '--alter']), '--output-format', 'json');
 
         return $this->shell($command, $this->full_scan ? null : $paths);
-    }
-
-    /**
-     * Convert the tool output to findings. Only the findings in the requested paths are kept.
-     *
-     * @param string $output Standard output of the tool
-     * @param Paths  $paths  Paths to be scanned
-     *
-     * @return array<Finding>
-     * @throws \JsonException
-     */
-    protected function extractFindings(string $output, Paths $paths): array
-    {
-        $findings = [];
-        foreach ($this->decodeJson($output) as $finding) {
-            $file = (string) ($finding['file_path'] ?? '');
-            if (!$paths->covers($file)) {
-                continue;
-            }
-            $findings[] = new Finding(
-                tool: $this->name(),
-                rule: $finding['type'] ?? 'unknown',
-                file: $file,
-                line: (int) ($finding['line_from'] ?? 0),
-                column: (int) ($finding['column_from'] ?? 0),
-                message: $finding['message'] ?? '',
-                type: Severity::fromString($finding['severity'] ?? ''),
-                fixable: \in_array($finding['type'] ?? 'unknown', self::FIXABLE_ERRORS, true),
-            );
-        }
-
-        return $findings;
     }
 
     /**
@@ -138,6 +108,39 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
         $command = Cli::has($command, ['--issues']) ? $command : $command.' --issues=all';
 
         return $this->shell($command, $paths);
+    }
+
+    /**
+     * Convert the tool output to findings. Only the findings in the requested paths are kept.
+     *
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
+     *
+     * @return array<Finding>
+     *
+     * @throws \JsonException
+     */
+    protected function extractFindings(string $output, Paths $paths): array
+    {
+        $findings = [];
+        foreach ($this->decodeJson($output) as $finding) {
+            $file = (string) ($finding['file_path'] ?? '');
+            if (!$paths->covers($file)) {
+                continue;
+            }
+            $findings[] = new Finding(
+                tool: $this->name(),
+                rule: $finding['type'] ?? 'unknown',
+                file: $file,
+                line: (int) ($finding['line_from'] ?? 0),
+                column: (int) ($finding['column_from'] ?? 0),
+                message: $finding['message'] ?? '',
+                type: Severity::fromString($finding['severity'] ?? ''),
+                fixable: \in_array($finding['type'] ?? 'unknown', self::FIXABLE_ERRORS, true),
+            );
+        }
+
+        return $findings;
     }
 
     /**

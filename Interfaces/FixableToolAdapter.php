@@ -19,6 +19,7 @@ interface FixableToolAdapter extends ToolAdapter
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
      * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
     public function buildFixProcess(Paths $paths): Process;

@@ -11,7 +11,7 @@ use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for PHPStan https://github.com/phpstan/phpstan
+ * Adapter for PHPStan https://github.com/phpstan/phpstan.
  */
 final readonly class Stan extends AbstractAdapter
 {
@@ -20,7 +20,9 @@ final readonly class Stan extends AbstractAdapter
      */
     protected const array OK_EXIT_CODES = [0, 1];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'PHPStan';
@@ -52,6 +54,7 @@ final readonly class Stan extends AbstractAdapter
      * @param Paths  $paths  Paths to be scanned
      *
      * @return array<Finding>
+     *
      * @throws \JsonException
      */
     protected function extractFindings(string $output, Paths $paths): array

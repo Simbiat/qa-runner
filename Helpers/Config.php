@@ -7,21 +7,26 @@ namespace Simbiat\QARunner\Helpers;
 use JetBrains\PhpStorm\ExpectedValues;
 
 /**
- * Config class for QA Runner
+ * Config class for QA Runner.
  */
 final readonly class Config
 {
-    /** Maximum depth of `@script` references, to stop circular references. */
+    /**
+     * Maximum depth of `@script` references, to stop circular references.
+     */
     private const int MAX_DEPTH = 10;
 
     /**
      * @param array<string, mixed> $data         full composer.json content
      * @param string               $project_root Path to project root
      */
-    private function __construct(private array $data, private string $project_root) {}
+    private function __construct(
+        private array $data,
+        private string $project_root
+    ) {}
 
     /**
-     * Attempt to get composer.json content from project root
+     * Attempt to get composer.json content from project root.
      *
      * @param string $project_root Path to project root directory
      *
@@ -37,7 +42,7 @@ final readonly class Config
     }
 
     /**
-     * Get commands from composer.json for respective set
+     * Get commands from composer.json for respective set.
      *
      * @param string $mode Respective mode to get commands for
      *

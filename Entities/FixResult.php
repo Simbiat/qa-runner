@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Entities;
 
 /**
- * Result or autofix from a tool
+ * Result or autofix from a tool.
  */
 final readonly class FixResult
 {

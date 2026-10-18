@@ -10,13 +10,13 @@ use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 
 /**
- * Runner for Fix command
+ * Runner for Fix command.
  */
 final readonly class Fix
 {
     /**
      * @param array<string, FixableToolAdapter> $adapters List of adapters to use
-     * @param float|null                        $timeout  Timeout in seconds for each tool. Null means no timeout.
+     * @param null|float                        $timeout  Timeout in seconds for each tool. Null means no timeout.
      */
     public function __construct(
         private array  $adapters,
@@ -36,6 +36,7 @@ final readonly class Fix
         $results = [];
         foreach ($this->adapters as $adapter) {
             $process = null;
+
             try {
                 $process = $adapter->buildFixProcess($paths);
                 $process->setTimeout($this->timeout);

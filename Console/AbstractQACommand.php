@@ -26,10 +26,14 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 abstract class AbstractQACommand extends Command
 {
-    /** Exit code for wrong usage or a tool, that did not run properly. Exit code 1 means findings. */
+    /**
+     * Exit code for wrong usage or a tool, that did not run properly. Exit code 1 means findings.
+     */
     public const int EXIT_ERROR = self::INVALID;
 
-    /** Timeout for each tool in seconds, if `--timeout` is not provided. */
+    /**
+     * Timeout for each tool in seconds, if `--timeout` is not provided.
+     */
     private const string DEFAULT_TIMEOUT = '600';
 
     /**
@@ -44,7 +48,7 @@ abstract class AbstractQACommand extends Command
      *
      * @param array<string, \Simbiat\QARunner\Interfaces\ToolAdapter> $adapters Adapters, that support the command
      * @param Paths                                                   $paths    Paths to process
-     * @param float|null                                              $timeout  Timeout for each tool in seconds. Null means no timeout.
+     * @param null|float                                              $timeout  Timeout for each tool in seconds. Null means no timeout.
      * @param InputInterface                                          $input    Input
      * @param OutputInterface                                         $output   Output
      *
@@ -74,11 +78,13 @@ abstract class AbstractQACommand extends Command
     {
         $project = $this->projectDirectory($input);
         $timeout = $this->timeout($input);
+
         try {
             $paths = Paths::fromCli($input->getArgument('paths'), (string) \getcwd());
         } catch (\InvalidArgumentException $exception) {
             throw new InvalidArgumentException($exception->getMessage(), previous: $exception);
         }
+
         try {
             $config = Config::fromProjectRoot($project);
         } catch (\JsonException $exception) {
@@ -151,7 +157,7 @@ abstract class AbstractQACommand extends Command
      *
      * @param InputInterface $input Input
      *
-     * @return float|null Seconds, or null for no timeout
+     * @return null|float Seconds, or null for no timeout
      */
     private function timeout(InputInterface $input): ?float
     {
@@ -172,6 +178,7 @@ abstract class AbstractQACommand extends Command
      * @param OutputInterface $output  Output
      *
      * @return array<string, ToolAdapter>
+     *
      * @throws \ReflectionException
      */
     private function createAdapters(Config $config, string $project, InputInterface $input, OutputInterface $output): array
@@ -198,7 +205,7 @@ abstract class AbstractQACommand extends Command
 
                 continue;
             }
-            /** @var class-string<ToolAdapter> $class -- False positive from EA Inspections, despite the proper hinting in the method */
+            /* @var class-string<ToolAdapter> $class -- False positive from EA Inspections, despite the proper hinting in the method */
             $adapters[$class] = new $class($project, $command, $full_scan, $bin_dir);
         }
 

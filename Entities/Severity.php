@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Entities;
 
 /**
- * Normalized severity of a finding
+ * Normalized severity of a finding.
  */
 enum Severity: string
 {

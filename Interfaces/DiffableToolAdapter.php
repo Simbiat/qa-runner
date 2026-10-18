@@ -19,6 +19,7 @@ interface DiffableToolAdapter extends ToolAdapter
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
      * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
     public function buildDiffProcess(Paths $paths): Process;
@@ -30,6 +31,7 @@ interface DiffableToolAdapter extends ToolAdapter
      * @param Paths   $paths   Paths to be scanned. Taken from CLI.
      *
      * @return string
+     *
      * @throws ToolFailure If the tool did not run properly
      */
     public function parseDiff(Process $process, Paths $paths): string;

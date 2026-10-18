@@ -12,7 +12,9 @@ final readonly class Paths
     /**
      * @param list<string> $absolute Absolute canonical paths
      */
-    private function __construct(public array $absolute) {}
+    private function __construct(
+        public array $absolute
+    ) {}
 
     /**
      * Resolve paths against the current directory.

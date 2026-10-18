@@ -10,7 +10,7 @@ use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Runner for Diff command
+ * Runner for Diff command.
  */
 final readonly class Diff extends AbstractCommand
 {

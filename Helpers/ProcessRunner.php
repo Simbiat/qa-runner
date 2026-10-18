@@ -16,7 +16,7 @@ final class ProcessRunner
      * The loop reads the output of every process all the time. If only one process was waited for, the others could stop on a full pipe buffer.
      *
      * @param array<string, Process> $processes Processes to run
-     * @param float|null             $timeout   Timeout in seconds for each process. Null means no timeout.
+     * @param null|float             $timeout   Timeout in seconds for each process. Null means no timeout.
      *
      * @return array<string, \Throwable> Errors (for example, timeouts) by the keys of the processes, that did not end properly
      */
@@ -38,6 +38,7 @@ final class ProcessRunner
                 try {
                     if ($process->isRunning()) {
                         $process->checkTimeout();
+
                         continue;
                     }
                 } catch (\Throwable $exception) {

@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Helpers;
 
 /**
- * Escape paths
+ * Escape paths.
  */
 final class PathEscaper
 {
     /**
-     * Escape paths
+     * Escape paths.
      *
      * @param array $paths Paths to escape
      *

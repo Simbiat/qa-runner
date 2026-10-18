@@ -14,7 +14,7 @@ use Symfony\Component\Process\Process;
 use TwigCsFixer\Rules\AbstractFixableRule;
 
 /**
- * Adapter for Twig CS Fixer https://github.com/VincentLanglet/Twig-CS-Fixer
+ * Adapter for Twig CS Fixer https://github.com/VincentLanglet/Twig-CS-Fixer.
  */
 final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapter
 {
@@ -23,7 +23,9 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      */
     protected const array OK_EXIT_CODES = [0, 1];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'Twig CS Fixer';
@@ -47,12 +49,29 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
     }
 
     /**
+     * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
+     *
+     * @param Paths $paths Paths to be processed. Taken from CLI.
+     *
+     * @return Process
+     */
+    public function buildFixProcess(Paths $paths): Process
+    {
+        if (!Cli::mentions($this->command, 'twig-cs-fixer') || !Cli::has($this->command, ['--fix'])) {
+            throw new \UnexpectedValueException('Not a Twig CS Fixer fix command');
+        }
+
+        return $this->shell($this->command, $paths);
+    }
+
+    /**
      * Convert the tool output to findings.
      *
      * @param string $output Standard output of the tool
      * @param Paths  $paths  Paths to be scanned
      *
      * @return array<Finding>
+     *
      * @throws \RuntimeException If the output is not valid XML
      */
     protected function extractFindings(string $output, Paths $paths): array
@@ -74,6 +93,7 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
             $file = $this->absolute($file_node->getAttribute('name'));
             foreach ($file_node->getElementsByTagName('error') as $error_node) {
                 $source = $error_node->getAttribute('source') ?: 'unknown';
+
                 try {
                     $fixable = \is_a($source, AbstractFixableRule::class, true);
                 } catch (\Throwable) {
@@ -93,21 +113,5 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
         }
 
         return $findings;
-    }
-
-    /**
-     * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
-     *
-     * @param Paths $paths Paths to be processed. Taken from CLI.
-     *
-     * @return Process
-     */
-    public function buildFixProcess(Paths $paths): Process
-    {
-        if (!Cli::mentions($this->command, 'twig-cs-fixer') || !Cli::has($this->command, ['--fix'])) {
-            throw new \UnexpectedValueException('Not a Twig CS Fixer fix command');
-        }
-
-        return $this->shell($this->command, $paths);
     }
 }

@@ -7,12 +7,12 @@ namespace Simbiat\QARunner\Interfaces;
 use Simbiat\QARunner\Entities\Finding;
 
 /**
- * Interface for output formatters, that can be used with Check command
+ * Interface for output formatters, that can be used with Check command.
  */
 interface OutputFormatter
 {
     /**
-     * Main function to prepare the output
+     * Main function to prepare the output.
      *
      * @param array<Finding> $findings List of found issues. Already sorted by the caller, so formatters must keep the order.
      *

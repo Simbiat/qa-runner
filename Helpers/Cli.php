@@ -86,7 +86,7 @@ final class Cli
      *
      * @param string $command Command line
      *
-     * @return string|null Null if the program cannot be told without a shell (variables, substitutions, `@` references, operators right after the word)
+     * @return null|string Null if the program cannot be told without a shell (variables, substitutions, `@` references, operators right after the word)
      */
     public static function program(string $command): ?string
     {
@@ -110,9 +110,9 @@ final class Cli
      *
      * @param string      $command      Command line
      * @param string      $project_root Project root, that relative paths are resolved against
-     * @param string|null $bin_dir      Directory with binaries of Composer packages
+     * @param null|string $bin_dir      Directory with binaries of Composer packages
      *
-     * @return string|null Reason, why the program cannot be run. Null if it can, or if it cannot be checked.
+     * @return null|string Reason, why the program cannot be run. Null if it can, or if it cannot be checked.
      */
     public static function unrunnableReason(string $command, string $project_root, ?string $bin_dir): ?string
     {

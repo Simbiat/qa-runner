@@ -15,7 +15,9 @@ use Symfony\Component\Process\Process;
  */
 interface ToolAdapter
 {
-    /** Display label used as Finding::tool, e.g. 'PHP CodeSniffer'. */
+    /**
+     * Display label used as Finding::tool, e.g. 'PHP CodeSniffer'.
+     */
     public function name(): string;
 
     /**
@@ -24,6 +26,7 @@ interface ToolAdapter
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
      * @throws \UnexpectedValueException If the command from composer.json is not a command of the tool
      */
     public function buildCheckProcess(Paths $paths): Process;
@@ -35,7 +38,8 @@ interface ToolAdapter
      * @param Paths   $paths   Paths to be scanned. Taken from CLI.
      *
      * @return array<Finding>
-     * @throws ToolFailure If the tool did not run properly
+     *
+     * @throws ToolFailure    If the tool did not run properly
      */
     public function parseCheck(Process $process, Paths $paths): array;
 }

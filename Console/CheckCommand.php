@@ -25,7 +25,9 @@ use Symfony\Component\Console\Output\OutputInterface;
 #[AsCommand(name: 'check', description: 'Run all configured tools and combine their findings into one report')]
 final class CheckCommand extends AbstractQACommand
 {
-    /** Available output formats. */
+    /**
+     * Available output formats.
+     */
     private const array FORMATS = ['ide', 'console'];
 
     /**

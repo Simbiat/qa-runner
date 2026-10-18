@@ -27,32 +27,23 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      */
     protected const array FIX_OK_EXIT_CODES = [0];
 
-    /** Maximum length of the tool output, that goes to a failure message. */
+    /**
+     * Maximum length of the tool output, that goes to a failure message.
+     */
     private const int MESSAGE_LIMIT = 500;
 
     /**
      * @param string      $project_root Path to project root
      * @param string      $command      Command from composer.json for the current mode
      * @param bool        $full_scan    Whether to scan the full project or just the provided paths (used only by tools, that benefit from full scans)
-     * @param string|null $bin_dir      Directory with binaries of Composer packages, to be added to PATH
+     * @param null|string $bin_dir      Directory with binaries of Composer packages, to be added to PATH
      */
     public function __construct(
-        protected string  $project_root,
-        protected string  $command,
-        protected bool    $full_scan = true,
+        protected string $project_root,
+        protected string $command,
+        protected bool $full_scan = true,
         protected ?string $bin_dir = null,
     ) {}
-
-    /**
-     * Convert the tool output to findings.
-     *
-     * @param string $output Standard output of the tool
-     * @param Paths  $paths  Paths to be scanned
-     *
-     * @return array<Finding>
-     * @throws \JsonException|\RuntimeException If the output is not in the expected format
-     */
-    abstract protected function extractFindings(string $output, Paths $paths): array;
 
     /**
      * Parse the tool output.
@@ -61,9 +52,10 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      * @param Paths   $paths   Paths to be scanned
      *
      * @return array<Finding>
-     * @throws ToolFailure|\JsonException|\RuntimeException
+     *
+     * @throws \JsonException|\RuntimeException|ToolFailure
      */
-    public function parseCheck(Process $process, Paths $paths): array
+    final public function parseCheck(Process $process, Paths $paths): array
     {
         $this->assertExitCode($process);
 
@@ -77,10 +69,12 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      * @param Paths   $paths   Paths to be scanned
      *
      * @return string
+     *
      * @throws ToolFailure
+     *
      * @noinspection PhpUnusedParameterInspection $paths can be used by overriden versions of the function.
      */
-    public function parseDiff(Process $process, Paths $paths): string
+    final public function parseDiff(Process $process, Paths $paths): string
     {
         $this->assertExitCode($process);
 
@@ -94,11 +88,12 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      * @param Paths   $paths   Paths to be processed
      *
      * @return FixResult
+     *
      * @noinspection PhpUnusedParameterInspection $paths can be used by overriden versions of the function.
      */
-    public function parseFix(Process $process, Paths $paths): FixResult
+    final public function parseFix(Process $process, Paths $paths): FixResult
     {
-        /** @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
+        /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
         return new FixResult(
             tool: $this->name(),
             success: \in_array($process->getExitCode(), static::FIX_OK_EXIT_CODES, true),
@@ -107,10 +102,22 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     }
 
     /**
+     * Convert the tool output to findings.
+     *
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
+     *
+     * @return array<Finding>
+     *
+     * @throws \JsonException|\RuntimeException If the output is not in the expected format
+     */
+    abstract protected function extractFindings(string $output, Paths $paths): array;
+
+    /**
      * Create the process. The tools run in the project root, with the binaries directory of Composer in PATH.
      *
      * @param string                               $command Command line
-     * @param \Simbiat\QARunner\Helpers\Paths|null $paths   Paths to append to the command. Null if the command must run without paths.
+     * @param null|\Simbiat\QARunner\Helpers\Paths $paths   Paths to append to the command. Null if the command must run without paths.
      *
      * @return Process
      */
@@ -134,7 +141,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     protected function assertExitCode(Process $process): void
     {
         $code = $process->getExitCode();
-        /** @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
+        /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
         if ($code !== null && \in_array($code, static::OK_EXIT_CODES, true)) {
             return;
         }
@@ -157,6 +164,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      * @param string $output Standard output of the tool
      *
      * @return array<array-key, mixed>
+     *
      * @throws \JsonException
      */
     protected function decodeJson(string $output): array

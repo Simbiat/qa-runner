@@ -13,7 +13,7 @@ use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for Rector https://github.com/rectorphp/rector
+ * Adapter for Rector https://github.com/rectorphp/rector.
  */
 final readonly class Rector extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
@@ -22,7 +22,9 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
      */
     protected const array OK_EXIT_CODES = [0, 2];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'Rector';
@@ -43,42 +45,6 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
         $command = Cli::ensureFlag(Cli::setOption($this->command, '--output-format', 'json'), '--dry-run');
 
         return $this->shell($command, $paths);
-    }
-
-    /**
-     * Convert the tool output to findings.
-     *
-     * @param string $output Standard output of the tool
-     * @param Paths  $paths  Paths to be scanned
-     *
-     * @return array<Finding>
-     * @throws \JsonException
-     */
-    protected function extractFindings(string $output, Paths $paths): array
-    {
-        $findings = [];
-        foreach ($this->decodeJson($output)['file_diffs'] ?? [] as $file_data) {
-            $file = $this->absolute($file_data['file'] ?? '');
-            foreach ($file_data['changes'] ?? [] as $finding) {
-                $rector = (string) ($finding['rector'] ?? 'unknown');
-                try {
-                    $description = (new ReflectionClass($rector))->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
-                } catch (\Throwable) {
-                    $description = '';
-                }
-                $findings[] = new Finding(
-                    tool: $this->name(),
-                    rule: self::shortName($rector),
-                    file: $file,
-                    line: (int) ($finding['line'] ?? 0),
-                    message: $description,
-                    // Rector has only fixable issues by design
-                    fixable: true,
-                );
-            }
-        }
-
-        return $findings;
     }
 
     /**
@@ -113,6 +79,44 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
         $command = Cli::setOption(Cli::strip($this->command, ['--no-diffs', '--dry-run']), '--output-format', 'console');
 
         return $this->shell($command, $paths);
+    }
+
+    /**
+     * Convert the tool output to findings.
+     *
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
+     *
+     * @return array<Finding>
+     *
+     * @throws \JsonException
+     */
+    protected function extractFindings(string $output, Paths $paths): array
+    {
+        $findings = [];
+        foreach ($this->decodeJson($output)['file_diffs'] ?? [] as $file_data) {
+            $file = $this->absolute($file_data['file'] ?? '');
+            foreach ($file_data['changes'] ?? [] as $finding) {
+                $rector = (string) ($finding['rector'] ?? 'unknown');
+
+                try {
+                    $description = (new ReflectionClass($rector))->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
+                } catch (\Throwable) {
+                    $description = '';
+                }
+                $findings[] = new Finding(
+                    tool: $this->name(),
+                    rule: self::shortName($rector),
+                    file: $file,
+                    line: (int) ($finding['line'] ?? 0),
+                    message: $description,
+                    // Rector has only fixable issues by design
+                    fixable: true,
+                );
+            }
+        }
+
+        return $findings;
     }
 
     /**

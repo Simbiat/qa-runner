@@ -11,7 +11,7 @@ use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for PHP Mess Detector https://github.com/phpmd/phpmd
+ * Adapter for PHP Mess Detector https://github.com/phpmd/phpmd.
  */
 final readonly class MessDetector extends AbstractAdapter
 {
@@ -20,7 +20,9 @@ final readonly class MessDetector extends AbstractAdapter
      */
     protected const array OK_EXIT_CODES = [0, 2];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'PHP Mess Detector';
@@ -50,6 +52,7 @@ final readonly class MessDetector extends AbstractAdapter
      * @param Paths  $paths  Paths to be scanned
      *
      * @return array<Finding>
+     *
      * @throws \JsonException
      */
     protected function extractFindings(string $output, Paths $paths): array

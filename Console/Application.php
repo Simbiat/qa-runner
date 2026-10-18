@@ -15,7 +15,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 final class Application extends SymfonyApplication
 {
     /**
-     * Class constructor
+     * Class constructor.
      *
      * @throws \Symfony\Component\Console\Exception\LogicException
      */

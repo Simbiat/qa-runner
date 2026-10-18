@@ -10,12 +10,12 @@ use Simbiat\QARunner\Interfaces\OutputFormatter;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 
 /**
- * A prettier and more human-readable format for the console with optional colors and 2 ways to group things
+ * A prettier and more human-readable format for the console with optional colors and 2 ways to group things.
  */
 final readonly class Console implements OutputFormatter
 {
     /**
-     * Colors by finding type (names of Symfony Console colors)
+     * Colors by finding type (names of Symfony Console colors).
      */
     private const array COLORS = [
         'ERROR' => 'red',
@@ -27,10 +27,13 @@ final readonly class Console implements OutputFormatter
      * @param bool $colors  Whether to color the output (pass `$output->isDecorated()`, so `--ansi`, `--no-ansi`, `NO_COLOR` and TTY detection work)
      * @param bool $by_rule Whether grouping by tool, type and rule should be used (the findings must be sorted accordingly) instead of grouping by file
      */
-    public function __construct(private bool $colors = true, private bool $by_rule = false) {}
+    public function __construct(
+        private bool $colors = true,
+        private bool $by_rule = false
+    ) {}
 
     /**
-     * Main function to prepare the output
+     * Main function to prepare the output.
      *
      * @param array<Finding> $findings List of found issues
      *

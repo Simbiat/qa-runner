@@ -13,7 +13,7 @@ use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for PHP CodeSniffer https://github.com/PHPCSStandards/PHP_CodeSniffer (version 4.x)
+ * Adapter for PHP CodeSniffer https://github.com/PHPCSStandards/PHP_CodeSniffer (version 4.x).
  */
 final readonly class CodeSniffer extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
@@ -27,7 +27,9 @@ final readonly class CodeSniffer extends AbstractAdapter implements DiffableTool
      */
     protected const array FIX_OK_EXIT_CODES = [0, 1, 2];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'PHP CodeSniffer';
@@ -46,36 +48,6 @@ final readonly class CodeSniffer extends AbstractAdapter implements DiffableTool
 
         // Enforce JSON format
         return $this->shell(Cli::setOption($this->command, '--report', 'json'), $paths);
-    }
-
-    /**
-     * Convert the tool output to findings.
-     *
-     * @param string $output Standard output of the tool
-     * @param Paths  $paths  Paths to be scanned
-     *
-     * @return array<Finding>
-     * @throws \JsonException
-     */
-    protected function extractFindings(string $output, Paths $paths): array
-    {
-        $findings = [];
-        foreach ($this->decodeJson($output)['files'] ?? [] as $file => $file_data) {
-            foreach ($file_data['messages'] ?? [] as $message) {
-                $findings[] = new Finding(
-                    tool: $this->name(),
-                    rule: $message['source'] ?? 'unknown',
-                    file: (string) $file,
-                    line: (int) ($message['line'] ?? 0),
-                    column: (int) ($message['column'] ?? 0),
-                    message: $message['message'] ?? '',
-                    type: Severity::fromString($message['type'] ?? ''),
-                    fixable: (bool) ($message['fixable'] ?? false),
-                );
-            }
-        }
-
-        return $findings;
     }
 
     /**
@@ -107,6 +79,37 @@ final readonly class CodeSniffer extends AbstractAdapter implements DiffableTool
         }
 
         return $this->shell($this->command, $paths);
+    }
+
+    /**
+     * Convert the tool output to findings.
+     *
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
+     *
+     * @return array<Finding>
+     *
+     * @throws \JsonException
+     */
+    protected function extractFindings(string $output, Paths $paths): array
+    {
+        $findings = [];
+        foreach ($this->decodeJson($output)['files'] ?? [] as $file => $file_data) {
+            foreach ($file_data['messages'] ?? [] as $message) {
+                $findings[] = new Finding(
+                    tool: $this->name(),
+                    rule: $message['source'] ?? 'unknown',
+                    file: (string) $file,
+                    line: (int) ($message['line'] ?? 0),
+                    column: (int) ($message['column'] ?? 0),
+                    message: $message['message'] ?? '',
+                    type: Severity::fromString($message['type'] ?? ''),
+                    fixable: (bool) ($message['fixable'] ?? false),
+                );
+            }
+        }
+
+        return $findings;
     }
 
     /**

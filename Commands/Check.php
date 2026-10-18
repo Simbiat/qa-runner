@@ -11,7 +11,7 @@ use Simbiat\QARunner\Interfaces\ToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Runner for Check command
+ * Runner for Check command.
  */
 final readonly class Check extends AbstractCommand
 {
@@ -25,7 +25,7 @@ final readonly class Check extends AbstractCommand
     public function run(Paths $paths): RunResult
     {
         $result = $this->runParallel(
-            static fn(ToolAdapter $adapter): Process => $adapter->buildCheckProcess($paths),
+            static fn (ToolAdapter $adapter): Process => $adapter->buildCheckProcess($paths),
             static fn(ToolAdapter $adapter, Process $process): array => $adapter->parseCheck($process, $paths),
         );
 

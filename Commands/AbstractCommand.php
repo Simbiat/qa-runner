@@ -17,7 +17,7 @@ abstract readonly class AbstractCommand
 {
     /**
      * @param array<string, ToolAdapter> $adapters List of adapters to use. They must support the command.
-     * @param float|null                 $timeout  Timeout in seconds for each tool. Null means no timeout.
+     * @param null|float                 $timeout  Timeout in seconds for each tool. Null means no timeout.
      */
     public function __construct(
         protected array  $adapters,
@@ -51,8 +51,10 @@ abstract readonly class AbstractCommand
         foreach ($running as $name => [$adapter, $process]) {
             if (isset($errors[$name])) {
                 $failures[$name] = FailureMessage::forRun($process, $errors[$name]);
+
                 continue;
             }
+
             try {
                 $results[$name] = $parse($adapter, $process);
             } catch (\Throwable $exception) {

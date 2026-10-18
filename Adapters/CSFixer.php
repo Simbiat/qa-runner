@@ -12,7 +12,7 @@ use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
- * Adapter for PHP CS Fixer https://github.com/PHP-CS-Fixer/PHP-CS-Fixer
+ * Adapter for PHP CS Fixer https://github.com/PHP-CS-Fixer/PHP-CS-Fixer.
  */
 final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
 {
@@ -21,7 +21,9 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
      */
     protected const array OK_EXIT_CODES = [0, 8];
 
-    /** Display label used as Finding::tool. */
+    /**
+     * Display label used as Finding::tool.
+     */
     public function name(): string
     {
         return 'PHP CS Fixer';
@@ -49,33 +51,6 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
         $command = Cli::strip($command, ['--stop-on-violation']);
 
         return $this->shell($this->withDryRun($command), $paths);
-    }
-
-    /**
-     * Convert the tool output to findings.
-     *
-     * @param string $output Standard output of the tool
-     * @param Paths  $paths  Paths to be scanned
-     *
-     * @return array<Finding>
-     * @throws \JsonException
-     */
-    protected function extractFindings(string $output, Paths $paths): array
-    {
-        $findings = [];
-        foreach ($this->decodeJson($output) as $finding) {
-            $findings[] = new Finding(
-                tool: $this->name(),
-                // Strip the prefix
-                rule: \str_ireplace('PHP-CS-Fixer.', '', $finding['check_name'] ?? 'unknown'),
-                file: $this->absolute($finding['location']['path'] ?? ''),
-                line: (int) ($finding['location']['lines']['begin'] ?? 0),
-                message: $finding['description'] ?? '',
-                fixable: true,
-            );
-        }
-
-        return $findings;
     }
 
     /**
@@ -110,6 +85,34 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
 
         // Remove --dry-run flag
         return $this->shell(Cli::strip($this->command, ['--dry-run']), $paths);
+    }
+
+    /**
+     * Convert the tool output to findings.
+     *
+     * @param string $output Standard output of the tool
+     * @param Paths  $paths  Paths to be scanned
+     *
+     * @return array<Finding>
+     *
+     * @throws \JsonException
+     */
+    protected function extractFindings(string $output, Paths $paths): array
+    {
+        $findings = [];
+        foreach ($this->decodeJson($output) as $finding) {
+            $findings[] = new Finding(
+                tool: $this->name(),
+                // Strip the prefix
+                rule: \str_ireplace('PHP-CS-Fixer.', '', $finding['check_name'] ?? 'unknown'),
+                file: $this->absolute($finding['location']['path'] ?? ''),
+                line: (int) ($finding['location']['lines']['begin'] ?? 0),
+                message: $finding['description'] ?? '',
+                fixable: true,
+            );
+        }
+
+        return $findings;
     }
 
     /**
