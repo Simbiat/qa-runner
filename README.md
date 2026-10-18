@@ -124,7 +124,9 @@ By default, all tools will run in current directory assuming that's your project
 
 #### --format=<format>
 
-Select output format. Currently only 2 options are supported: `ide` (default) and `console`. `ide` output will look like this:
+Select output format. 4 options are supported: `ide` (default), `console`, `csv`, and `tsv`.
+
+`ide` output will look like this:
 
 ```console
 /app/src/HomePage.php:462:26: [PHP CodeSniffer ERROR] Use of empty() is disallowed. (SlevomatCodingStandard.ControlStructures.DisallowEmpty.DisallowedEmpty)
@@ -138,7 +140,7 @@ Select output format. Currently only 2 options are supported: `ide` (default) an
         8:5: [PHP CodeSniffer ERROR] Use import statements for class/interface/trait/enum from the same namespace are not allowed. Found import statement for: "App\Controller\Api\Api" (Universal.UseStatements.DisallowUseClass.FromSameNamespace)
 ```
 
-Note, that `ide` format will force `line` and `column` to be `1` if none is reported by a tool or if it's reported as `0`. This is done because PHPStorm hides such reports in the `Problems` tab.
+`csv` and `tsv` will generate Comma-Separated Values and Tab-Separated Values respectively. CSV is compliant with RFC 4180, TSV is treated in similar way, but with tabs as delimiters.
 
 Applicable only to `check` mode.
 

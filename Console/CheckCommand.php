@@ -8,7 +8,9 @@ use Simbiat\QARunner\Commands\Check;
 use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Formatters\Console;
+use Simbiat\QARunner\Formatters\CSV;
 use Simbiat\QARunner\Formatters\IDE;
+use Simbiat\QARunner\Formatters\TSV;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Helpers\Sorter;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
@@ -96,6 +98,8 @@ final class CheckCommand extends AbstractQACommand
     {
         return match ($name) {
             'ide' => new IDE(),
+            'csv' => new CSV(),
+            'tsv' => new TSV(),
             'console' => new Console($colors, $by_type),
             default => throw new InvalidOptionException("Unknown format '$name'. Available: ".\implode(', ', self::FORMATS)),
         };
