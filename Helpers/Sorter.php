@@ -21,7 +21,7 @@ final class Sorter
     public static function sortByFile(array $findings): array
     {
         $sorted = \array_values($findings);
-        \usort($sorted, static fn(Finding $a, Finding $b): int => self::compareByFile($a, $b));
+        \usort($sorted, self::compareByFile(...));
 
         return $sorted;
     }
@@ -36,7 +36,7 @@ final class Sorter
     public static function sortByType(array $findings): array
     {
         $sorted = \array_values($findings);
-        \usort($sorted, static fn(Finding $a, Finding $b): int => self::compareByType($a, $b));
+        \usort($sorted, self::compareByType(...));
 
         return $sorted;
     }

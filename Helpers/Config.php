@@ -36,7 +36,7 @@ final readonly class Config
     {
         $root = \rtrim($project_root, '/');
         $file = $root.'/composer.json';
-        $data = \is_file($file) ? \json_decode((string) \file_get_contents($file), true, 512, \JSON_THROW_ON_ERROR) : null;
+        $data = \is_file($file) ? \json_decode((string) \file_get_contents($file), associative: true, depth: 512, flags: \JSON_THROW_ON_ERROR) : null;
 
         return new self(\is_array($data) ? $data : [], $root);
     }

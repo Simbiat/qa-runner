@@ -13,18 +13,16 @@ final readonly class Finding
      * @var int Line, where the finding is. Always 1 or more.
      */
     public int $line;
+
     /**
      * @var int Column, where the finding is. Always 1 or more.
      */
     public int $column;
+
     /**
      * @var string Finding description, always on a single line.
      */
     public string $message;
-    /**
-     * @var Severity Type of finding.
-     */
-    public Severity $type;
 
     /**
      * @param string   $tool    Tool name
@@ -37,18 +35,17 @@ final readonly class Finding
      * @param bool     $fixable Whether finding is fixable.
      */
     public function __construct(
-        public string $tool,
-        public string $rule,
-        public string $file,
-        int           $line = 1,
-        int           $column = 1,
-        string        $message = 'Something is wrong here',
-        Severity      $type = Severity::WARNING,
-        public bool   $fixable = false,
+        public string   $tool,
+        public string   $rule,
+        public string   $file,
+        int             $line = 1,
+        int             $column = 1,
+        string          $message = 'Something is wrong here',
+        public Severity $type = Severity::WARNING,
+        public bool     $fixable = false,
     ) {
         $this->line = \max(1, $line);
         $this->column = \max(1, $column);
         $this->message = \trim(\preg_replace('/\s*\R\s*/u', ' ', $message) ?? $message);
-        $this->type = $type;
     }
 }

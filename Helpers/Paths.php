@@ -34,6 +34,7 @@ final readonly class Paths
             if ($real === false || !\is_readable($real)) {
                 throw new \InvalidArgumentException('Not a readable path: '.$path);
             }
+
             $absolute[] = $real;
         }
 
@@ -72,6 +73,7 @@ final readonly class Paths
         if ($this->matches($file)) {
             return true;
         }
+
         $real = \realpath($file);
 
         return $real !== false && $this->matches($real);

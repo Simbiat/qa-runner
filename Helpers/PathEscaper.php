@@ -18,6 +18,6 @@ final class PathEscaper
      */
     public static function escapedPaths(array $paths): string
     {
-        return \implode('', \array_map(static fn(string $p) => ' '.\escapeshellarg($p), $paths));
+        return \implode('', \array_map(static fn(string $p): string => ' '.\escapeshellarg($p), $paths));
     }
 }

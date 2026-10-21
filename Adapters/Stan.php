@@ -38,8 +38,9 @@ final readonly class Stan extends AbstractAdapter
     public function buildCheckProcess(Paths $paths): Process
     {
         if (\preg_match('/phpstan\s+analy[sz]e/i', $this->command) !== 1) {
-            throw new \UnexpectedValueException('Not a PHPStan\'s analyse command');
+            throw new \UnexpectedValueException("Not a PHPStan's analyse command");
         }
+
         // String --quiet flag, because it will hide the output
         $command = Cli::strip($this->command, ['--quiet', '-q']);
 
@@ -65,6 +66,7 @@ final readonly class Stan extends AbstractAdapter
             if (!$paths->covers((string) $file)) {
                 continue;
             }
+
             foreach ($file_data['messages'] ?? [] as $message) {
                 $findings[] = new Finding(
                     tool: $this->name(),
@@ -75,6 +77,7 @@ final readonly class Stan extends AbstractAdapter
                 );
             }
         }
+
         // Errors, that are not tied to a file (for example, a bad configuration or an ignore pattern, that did not match). They are attached to the project root.
         foreach ($data['errors'] ?? [] as $error) {
             $findings[] = new Finding(

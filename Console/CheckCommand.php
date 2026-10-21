@@ -41,8 +41,8 @@ final class CheckCommand extends AbstractQACommand
         parent::configure();
         $this
             ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: '.\implode(' or ', self::FORMATS), 'ide', self::FORMATS)
-            ->addOption('by-type', null, InputOption::VALUE_NONE, 'Group findings by tool, type and rule instead of by file')
-            ->addOption('no-full-scan', null, InputOption::VALUE_NONE, 'Let tools like PHPStan and Psalm scan only the given paths instead of the full project');
+            ->addOption('by-type', mode: InputOption::VALUE_NONE, description: 'Group findings by tool, type and rule instead of by file')
+            ->addOption('no-full-scan', mode: InputOption::VALUE_NONE, description: 'Let tools like PHPStan and Psalm scan only the given paths instead of the full project');
     }
 
     /**
@@ -70,6 +70,7 @@ final class CheckCommand extends AbstractQACommand
         foreach ($result->failures as $tool => $message) {
             $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: Severity::ERROR);
         }
+
         $findings = $by_type ? Sorter::sortByType($findings) : Sorter::sortByFile($findings);
 
         $text = $formatter->format($findings);

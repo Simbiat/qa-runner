@@ -39,6 +39,7 @@ final class DiffCommand extends AbstractQACommand
             // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
             $output->writeln("========= Start of $tool output =========\n\n$diff\n\n========= End of $tool output =========", OutputInterface::OUTPUT_RAW);
         }
+
         foreach ($result->failures as $tool => $message) {
             $this->error($output, "$tool: $message");
         }

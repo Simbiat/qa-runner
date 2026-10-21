@@ -40,6 +40,7 @@ final readonly class MessDetector extends AbstractAdapter
         if (!Cli::mentions($this->command, 'phpmd analyze')) {
             throw new \UnexpectedValueException('Not a PHPMD command');
         }
+
         $command = Cli::strip($this->command, ['--progress']);
         $command = Cli::ensureFlag($command, '--no-progress');
 
@@ -73,6 +74,7 @@ final readonly class MessDetector extends AbstractAdapter
                 );
             }
         }
+
         // Files, that PHPMD could not process (for example, because of syntax errors)
         foreach ($data['errors'] ?? [] as $error) {
             if ($error['fileName'] === '') {

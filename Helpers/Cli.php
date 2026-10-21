@@ -136,9 +136,11 @@ final class Cli
             if (!\is_file($candidate)) {
                 continue;
             }
+
             if (\is_executable($candidate)) {
                 return null;
             }
+
             $not_executable ??= $candidate;
         }
 

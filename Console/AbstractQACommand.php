@@ -80,16 +80,17 @@ abstract class AbstractQACommand extends Command
         $timeout = $this->timeout($input);
 
         try {
-            $paths = Paths::fromCli($input->getArgument('paths'), (string) \getcwd());
+            $paths = Paths::fromCli($input->getArgument('paths'), \getcwd());
         } catch (\InvalidArgumentException $exception) {
-            throw new InvalidArgumentException($exception->getMessage(), previous: $exception);
+            throw new InvalidArgumentException($exception->getMessage(), $exception->getCode(), previous: $exception);
         }
 
         try {
             $config = Config::fromProjectRoot($project);
         } catch (\JsonException $exception) {
-            throw new RuntimeException('Failed to parse `composer.json`: '.$exception->getMessage(), previous: $exception);
+            throw new RuntimeException('Failed to parse `composer.json`: '.$exception->getMessage(), $exception->getCode(), previous: $exception);
         }
+
         $adapters = $this->createAdapters($config, $project, $input, $output);
         if ($adapters === []) {
             $this->error($output, 'No adapters can run in `'.$this->getName().'` mode. Check the settings in `composer.json`.');
@@ -183,28 +184,31 @@ abstract class AbstractQACommand extends Command
      */
     private function createAdapters(Config $config, string $project, InputInterface $input, OutputInterface $output): array
     {
-        $full_scan = !($input->hasOption('no-full-scan') && $input->getOption('no-full-scan'));
+        $full_scan = !$input->hasOption('no-full-scan') || !$input->getOption('no-full-scan');
         $bin_dir = $config->binDir();
         $required = $this->requiredInterface();
 
         $adapters = [];
         foreach ($config->commandsFor((string) $this->getName()) as $class => $command) {
-            if (!\is_a($class, ToolAdapter::class, true) || !new \ReflectionClass($class)->isInstantiable()) {
+            if (!\is_a($class, ToolAdapter::class, allow_string: true) || !new \ReflectionClass($class)->isInstantiable()) {
                 $this->warn($output, "'$class' is not a known ToolAdapter, skipping.");
 
                 continue;
             }
-            if (!\is_a($class, $required, true)) {
+
+            if (!\is_a($class, $required, allow_string: true)) {
                 $this->warn($output, "'$class' does not support '".$this->getName()."', skipping.");
 
                 continue;
             }
+
             $reason = Cli::unrunnableReason($command, $project, $bin_dir);
             if ($reason !== null) {
                 $this->warn($output, "'$class' skipped, because $reason. Command: `$command`");
 
                 continue;
             }
+
             /* @var class-string<ToolAdapter> $class -- False positive from EA Inspections, despite the proper hinting in the method */
             $adapters[$class] = new $class($project, $command, $full_scan, $bin_dir);
         }

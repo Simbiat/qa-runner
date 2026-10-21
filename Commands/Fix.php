@@ -43,7 +43,7 @@ final readonly class Fix
                 $process->run();
                 $results[] = $adapter->parseFix($process, $paths);
             } catch (\Throwable $exception) {
-                $results[] = new FixResult($adapter->name(), false, $process === null ? $exception->getMessage() : FailureMessage::forRun($process, $exception));
+                $results[] = new FixResult($adapter->name(), success: false, output: $process === null ? $exception->getMessage() : FailureMessage::forRun($process, $exception));
             }
         }
 

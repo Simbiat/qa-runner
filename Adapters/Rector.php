@@ -100,10 +100,11 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
                 $rector = (string) ($finding['rector'] ?? 'unknown');
 
                 try {
-                    $description = (new ReflectionClass($rector))->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
+                    $description = new ReflectionClass($rector)->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
                 } catch (\Throwable) {
                     $description = '';
                 }
+
                 $findings[] = new Finding(
                     tool: $this->name(),
                     rule: self::shortName($rector),

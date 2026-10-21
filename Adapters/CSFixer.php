@@ -122,7 +122,7 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
      */
     private function assertDryRun(): void
     {
-        if (!Cli::mentions($this->command, 'php-cs-fixer check') && !(Cli::mentions($this->command, 'php-cs-fixer fix') && Cli::has($this->command, ['--dry-run']))) {
+        if (!Cli::mentions($this->command, 'php-cs-fixer check') && (!Cli::mentions($this->command, 'php-cs-fixer fix') || !Cli::has($this->command, ['--dry-run']))) {
             throw new \UnexpectedValueException('Not a CS Fixer dry-run command');
         }
     }

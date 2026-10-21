@@ -52,6 +52,7 @@ final readonly class Console implements OutputFormatter
                 if ($notch_outer !== null) {
                     $lines[] = '';
                 }
+
                 $notch_outer = $outer;
                 $notch_bucket = null;
                 $notch_rule = null;

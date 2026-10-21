@@ -96,7 +96,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
         /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
         return new FixResult(
             tool: $this->name(),
-            success: \in_array($process->getExitCode(), static::FIX_OK_EXIT_CODES, true),
+            success: \in_array($process->getExitCode(), static::FIX_OK_EXIT_CODES, strict: true),
             output: \trim($process->getOutput()."\n".$process->getErrorOutput()),
         );
     }
@@ -142,7 +142,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     {
         $code = $process->getExitCode();
         /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
-        if ($code !== null && \in_array($code, static::OK_EXIT_CODES, true)) {
+        if ($code !== null && \in_array($code, static::OK_EXIT_CODES, strict: true)) {
             return;
         }
 
@@ -150,6 +150,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
         if ($details === '') {
             $details = \trim($process->getOutput());
         }
+
         $details = \mb_substr($details, 0, self::MESSAGE_LIMIT);
 
         throw new ToolFailure(
@@ -172,7 +173,8 @@ abstract readonly class AbstractAdapter implements ToolAdapter
         if (\trim($output) === '') {
             return [];
         }
-        $data = \json_decode($output, true, 512, \JSON_THROW_ON_ERROR);
+
+        $data = \json_decode($output, associative: true, depth: 512, flags: \JSON_THROW_ON_ERROR);
 
         return \is_array($data) ? $data : [];
     }

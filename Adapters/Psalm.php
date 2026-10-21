@@ -128,6 +128,7 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
             if (!$paths->covers($file)) {
                 continue;
             }
+
             $findings[] = new Finding(
                 tool: $this->name(),
                 rule: $finding['type'] ?? 'unknown',
@@ -136,7 +137,7 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
                 column: (int) ($finding['column_from'] ?? 0),
                 message: $finding['message'] ?? '',
                 type: Severity::fromString($finding['severity'] ?? ''),
-                fixable: \in_array($finding['type'] ?? 'unknown', self::FIXABLE_ERRORS, true),
+                fixable: \in_array($finding['type'] ?? 'unknown', self::FIXABLE_ERRORS, strict: true),
             );
         }
 
@@ -150,7 +151,7 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
      */
     private function assertPsalter(): void
     {
-        if (!Cli::mentions($this->command, 'psalter') && !(Cli::mentions($this->command, 'psalm') && Cli::has($this->command, ['--alter']))) {
+        if (!Cli::mentions($this->command, 'psalter') && (!Cli::mentions($this->command, 'psalm') || !Cli::has($this->command, ['--alter']))) {
             throw new \UnexpectedValueException('Not a Psalter command');
         }
     }

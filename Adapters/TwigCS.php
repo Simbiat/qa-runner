@@ -79,8 +79,9 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
         if (\trim($output) === '') {
             return [];
         }
+
         $dom = new DOMDocument();
-        $previous = \libxml_use_internal_errors(true);
+        $previous = \libxml_use_internal_errors(use_errors: true);
         $loaded = $dom->loadXML($output);
         \libxml_clear_errors();
         \libxml_use_internal_errors($previous);
@@ -95,10 +96,11 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
                 $source = $error_node->getAttribute('source') ?: 'unknown';
 
                 try {
-                    $fixable = \is_a($source, AbstractFixableRule::class, true);
+                    $fixable = \is_a($source, AbstractFixableRule::class, allow_string: true);
                 } catch (\Throwable) {
                     $fixable = false;
                 }
+
                 $findings[] = new Finding(
                     tool: $this->name(),
                     rule: self::shortName($source),

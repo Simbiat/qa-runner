@@ -45,8 +45,10 @@ final class ProcessRunner
                     $errors[$key] = $exception;
                     $process->stop(0);
                 }
+
                 unset($processes[$key]);
             }
+
             if ($processes !== []) {
                 \usleep(10_000);
             }

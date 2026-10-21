@@ -25,7 +25,7 @@ final class Application extends SymfonyApplication
 
         $this->addCommands([new CheckCommand(), new DiffCommand(), new FixCommand()]);
         // The bin file returns the exit code itself
-        $this->setAutoExit(false);
+        $this->setAutoExit(boolean: false);
     }
 
     /**
