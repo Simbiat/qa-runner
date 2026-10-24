@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Console;
 
 use Simbiat\QARunner\Helpers\Cli;
+use Simbiat\QARunner\Helpers\ColorDiff;
 use Simbiat\QARunner\Helpers\Config;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\ToolAdapter;
@@ -105,6 +106,28 @@ abstract class AbstractQACommand extends Command
         }
 
         return $this->runTools($adapters, $paths, $timeout, $input, $output);
+    }
+
+    /**
+     * Write the combined diffs of the files. With colors, the diffs are colored. Without colors, they stay in the plain unified format, which `patch` can read.
+     *
+     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
+     * @param array<string, string>                                $diffs  Path => diff
+     */
+    protected function writeDiffs(OutputInterface $output, array $diffs): void
+    {
+        if ($diffs === []) {
+            return;
+        }
+
+        if ($output->isDecorated()) {
+            $output->writeln(\implode("\n\n", \array_map(ColorDiff::format(...), \array_keys($diffs), $diffs)));
+
+            return;
+        }
+
+        // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
+        $output->writeln(\implode("\n\n", $diffs), OutputInterface::OUTPUT_RAW);
     }
 
     /**

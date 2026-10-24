@@ -42,6 +42,7 @@ final class CheckCommand extends AbstractQACommand
         $this
             ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: '.\implode(' or ', self::FORMATS), 'ide', self::FORMATS)
             ->addOption('by-type', mode: InputOption::VALUE_NONE, description: 'Group findings by tool, type and rule instead of by file')
+            ->addOption('fixable', mode: InputOption::VALUE_NONE, description: 'Show only the findings, that the tools can fix. Failures of the tools are still shown')
             ->addOption('count', mode: InputOption::VALUE_NONE, description: 'Add a `Count` column with the number of findings of the same rule (only for `csv` and `tsv` formats)')
             ->addOption('by-count', mode: InputOption::VALUE_NONE, description: 'Sort findings by `Count`, from the highest to the lowest. Implies `--count`')
             ->addOption('no-full-scan', mode: InputOption::VALUE_NONE, description: 'Let tools like PHPStan and Psalm scan only the given paths instead of the full project');
@@ -80,7 +81,8 @@ final class CheckCommand extends AbstractQACommand
         $result = new Check($adapters, $timeout)->run($paths);
 
         // Failures are shown among the findings, since the IDE shows only the output, that has file and line in it
-        $findings = $result->items;
+        $items = (bool) $input->getOption('fixable') ? \array_values(\array_filter($result->items, static fn(Finding $finding): bool => $finding->fixable)) : $result->items;
+        $findings = $items;
         foreach ($result->failures as $tool => $message) {
             $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: Severity::ERROR);
         }
@@ -99,7 +101,7 @@ final class CheckCommand extends AbstractQACommand
 
         return match (true) {
             $result->failures !== [] => self::EXIT_ERROR,
-            $result->items !== [] => self::FAILURE,
+            $items !== [] => self::FAILURE,
             default => self::SUCCESS,
         };
     }

@@ -48,10 +48,6 @@ final readonly class Fix
             }
 
             $results = $this->runTools($copies);
-            if ($apply) {
-                return new FixRun($results, [], $copies->apply());
-            }
-
             $diffs = [];
             $errors = [];
             foreach ($copies->changed() as $original) {
@@ -60,6 +56,11 @@ final readonly class Fix
                 } catch (\Throwable $exception) {
                     $errors[] = "Failed to create the diff for '{$original}': ".$exception->getMessage();
                 }
+            }
+
+            if ($apply) {
+                // The diffs are made before this, because the copies are still the source of the changes
+                $errors = [...$errors, ...$copies->apply()];
             }
 
             return new FixRun($results, $diffs, $errors);

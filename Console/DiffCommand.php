@@ -48,6 +48,8 @@ final class DiffCommand extends AbstractQACommand
         $fixer = new Fix($adapters, $timeout);
         $run = $fixer->run($paths, apply: false);
 
+        $this->writeDiffs($output, $run->diffs);
+
         $failed = false;
         foreach ($run->results as $result) {
             if (!$result->success) {
@@ -60,9 +62,6 @@ final class DiffCommand extends AbstractQACommand
             $failed = true;
             $this->error($output, $error);
         }
-
-        // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
-        $output->writeln(\implode("\n\n", $run->diffs), OutputInterface::OUTPUT_RAW);
 
         return match (true) {
             $failed => self::EXIT_ERROR,

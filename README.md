@@ -41,7 +41,7 @@ Note, that you may not need the `/app` in prefix for the `Arguments` or `Output 
 The tool also supports 2 other commands besides `check`:
 
 1. `diff`: shows what the fixers would change. The runner copies each file to a temporary file in the same directory. Then it runs the fixers on the copy, one after another. Each fixer gets the result of the previous one. The output is one combined unified diff for each file, not a separate output for each tool. The original files do not change, and the temporary files are removed at the end.
-2. `fix`: uses the same process as `diff`, but replaces each changed original file with its fixed copy. The output of each tool is shown with a styled header. The original file is not touched if it changed on the disk during the run (for example, you saved it in the IDE). In this case you get an error, and the fixes for this file are not applied.
+2. `fix`: uses the same process as `diff`, but replaces each changed original file with its fixed copy. The output of each tool is shown with a styled header, if respective tool failed. The original file is not touched if it changed on the disk during the run (for example, you saved it in the IDE). In this case you get an error, and the fixes for this file are not applied.
 
 Both commands use the commands from the `fix` node of `composer.json` (see below). The order of the adapters in that node is the order in which the fixers run.
 
@@ -139,6 +139,10 @@ vendor/bin/qa-runner check --tool-type=php --tool-type=twig /app/src /app/templa
 ```
 
 If no tool matches, QA Runner shows an error.
+
+#### --fixable
+
+Shows only the findings that the tools can fix. It works with all formats, and the `--count` values and the exit code use only the findings that are shown. Failures of the tools are always shown. Tools that cannot report fixable findings (for example, PHPStan) give no findings with this flag.
 
 #### --format=<format>
 

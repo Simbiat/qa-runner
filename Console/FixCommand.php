@@ -14,6 +14,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 /**
  * Apply the fixes of the tools, that can fix things.
  * The fixers run on temporary copies of the files, one after another. Then each changed file is replaced with its fixed copy.
+ * The output is the combined diff of the changes, then the output of the tools that failed.
  */
 #[AsCommand(name: 'fix', description: 'Apply fixes with the tools, that can fix things (changes files!)')]
 final class FixCommand extends AbstractQACommand
@@ -33,18 +34,28 @@ final class FixCommand extends AbstractQACommand
     #[\Override]
     protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int
     {
-        $run = new Fix($adapters, $timeout)->run($paths, apply: true);
+        /** @var array<string, \Simbiat\QARunner\Interfaces\FixableToolAdapter> $adapters */
+        $fixer = new Fix($adapters, $timeout);
+        $run = $fixer->run($paths, apply: true);
 
+        // The combined diff goes first
+        $this->writeDiffs($output, $run->diffs);
+
+        // Then only the tools that failed
         $failed = false;
-        foreach ($run->results as $iteration => $result) {
+        foreach ($run->results as $result) {
+            if ($result->success) {
+                continue;
+            }
+
             // Raw output: the tools can print `<` and `>` and their own ANSI colors, which must stay as they are
             $output->writeln(
-                ($iteration > 0 ? "\n" : '')."========= Start of {$result->tool} output =========\n\n"
+                ($failed || $run->diffs !== [] ? "\n" : '')."========= Start of {$result->tool} output =========\n\n"
                 .($result->output !== '' ? $result->output."\n\n" : '')
                 ."========= End of {$result->tool} output =========",
                 OutputInterface::OUTPUT_RAW,
             );
-            $failed = $failed || !$result->success;
+            $failed = true;
         }
 
         foreach ($run->errors as $error) {
