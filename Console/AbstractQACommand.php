@@ -37,27 +37,7 @@ abstract class AbstractQACommand extends Command
     private const string DEFAULT_TIMEOUT = '600';
 
     /**
-     * Interface, that an adapter must implement to be used by the command.
-     *
-     * @return class-string<\Simbiat\QARunner\Interfaces\ToolAdapter>
-     */
-    abstract protected function requiredInterface(): string;
-
-    /**
-     * Run the tools.
-     *
-     * @param array<string, \Simbiat\QARunner\Interfaces\ToolAdapter> $adapters Adapters, that support the command
-     * @param Paths                                                   $paths    Paths to process
-     * @param null|float                                              $timeout  Timeout for each tool in seconds. Null means no timeout.
-     * @param InputInterface                                          $input    Input
-     * @param OutputInterface                                         $output   Output
-     *
-     * @return int Exit code
-     */
-    abstract protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int;
-
-    /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     #[\Override]
     protected function configure(): void
@@ -65,19 +45,45 @@ abstract class AbstractQACommand extends Command
         $this
             ->addArgument('paths', InputArgument::IS_ARRAY | InputArgument::REQUIRED, 'Files or directories to process')
             ->addOption('project', 'p', InputOption::VALUE_REQUIRED, 'Project directory with composer.json (default: current directory)')
+            ->addOption('tool-type', 'T', InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, 'Run only the tools of this type (for example, `php` or `twig`). Can be used several times. Without it all the configured tools run')
             ->addOption('timeout', 't', InputOption::VALUE_REQUIRED, 'Timeout for each tool in seconds, 0 means no timeout', self::DEFAULT_TIMEOUT);
     }
 
     /**
-     * @inheritDoc
+     * Write an error to the error output.
+     *
+     * @param OutputInterface $output  Output
+     * @param string          $message Message
+     */
+    protected function error(OutputInterface $output, string $message): void
+    {
+        $this->errorOutput($output)->writeln('<error>qa-runner: '.OutputFormatter::escape($message).'</error>');
+    }
+
+    /**
+     * Output for errors and warnings: STDERR, if the output has it.
+     *
+     * @param OutputInterface $output Output
+     *
+     * @return OutputInterface
+     */
+    protected function errorOutput(OutputInterface $output): OutputInterface
+    {
+        return $output instanceof ConsoleOutputInterface
+            ? $output->getErrorOutput()
+            : $output;
+    }
+
+    /**
+     * {@inheritDoc}
      *
      * @throws \ReflectionException
      */
     #[\Override]
     protected function execute(InputInterface $input, OutputInterface $output): int
     {
-        $project = $this->projectDirectory($input);
-        $timeout = $this->timeout($input);
+        $project = self::projectDirectory($input);
+        $timeout = self::timeout($input);
 
         try {
             $paths = Paths::fromCli($input->getArgument('paths'), \getcwd());
@@ -93,7 +99,7 @@ abstract class AbstractQACommand extends Command
 
         $adapters = $this->createAdapters($config, $project, $input, $output);
         if ($adapters === []) {
-            $this->error($output, 'No adapters can run in `'.$this->getName().'` mode. Check the settings in `composer.json`.');
+            $this->error($output, 'No adapters can run in `'.$this->getName().'` mode. Check the `'.$this->configMode().'` settings in `composer.json` and the `--tool-type` values.');
 
             return self::EXIT_ERROR;
         }
@@ -102,16 +108,34 @@ abstract class AbstractQACommand extends Command
     }
 
     /**
-     * Output for errors and warnings: STDERR, if the output has it.
+     * Name of the node in `extra.qa-runner` in composer.json, that has the commands for this command. By default, it is the name of the command.
      *
-     * @param OutputInterface $output Output
-     *
-     * @return OutputInterface
+     * @return string
      */
-    protected function errorOutput(OutputInterface $output): OutputInterface
+    protected function configMode(): string
     {
-        return $output instanceof ConsoleOutputInterface ? $output->getErrorOutput() : $output;
+        return (string) $this->getName();
     }
+
+    /**
+     * Interface, that an adapter must implement to be used by the command.
+     *
+     * @return class-string<ToolAdapter>
+     */
+    abstract protected function requiredInterface(): string;
+
+    /**
+     * Run the tools.
+     *
+     * @param array<string, ToolAdapter> $adapters Adapters, that support the command
+     * @param Paths                      $paths    Paths to process
+     * @param float|null                 $timeout  Timeout for each tool in seconds. Null means no timeout.
+     * @param InputInterface             $input    Input
+     * @param OutputInterface            $output   Output
+     *
+     * @return int Exit code
+     */
+    abstract protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int;
 
     /**
      * Write a warning to the error output.
@@ -122,52 +146,6 @@ abstract class AbstractQACommand extends Command
     protected function warn(OutputInterface $output, string $message): void
     {
         $this->errorOutput($output)->writeln('<comment>qa-runner: '.OutputFormatter::escape($message).'</comment>');
-    }
-
-    /**
-     * Write an error to the error output.
-     *
-     * @param OutputInterface $output  Output
-     * @param string          $message Message
-     */
-    protected function error(OutputInterface $output, string $message): void
-    {
-        $this->errorOutput($output)->writeln('<error>qa-runner: '.OutputFormatter::escape($message).'</error>');
-    }
-
-    /**
-     * Project directory from `--project`, or the current directory.
-     *
-     * @param InputInterface $input Input
-     *
-     * @return string
-     */
-    private function projectDirectory(InputInterface $input): string
-    {
-        $raw = $input->getOption('project') ?? \getcwd();
-        $project = \is_string($raw) ? \realpath($raw) : false;
-        if ($project === false || !\is_dir($project)) {
-            throw new InvalidOptionException('Not a readable project directory.');
-        }
-
-        return $project;
-    }
-
-    /**
-     * Timeout from `--timeout`.
-     *
-     * @param InputInterface $input Input
-     *
-     * @return null|float Seconds, or null for no timeout
-     */
-    private function timeout(InputInterface $input): ?float
-    {
-        $raw = $input->getOption('timeout');
-        if (!\is_numeric($raw) || (float) $raw < 0) {
-            throw new InvalidOptionException('Option `--timeout` needs a number of seconds, 0 or more.');
-        }
-
-        return (float) $raw > 0 ? (float) $raw : null;
     }
 
     /**
@@ -186,33 +164,102 @@ abstract class AbstractQACommand extends Command
     {
         $full_scan = !$input->hasOption('no-full-scan') || !$input->getOption('no-full-scan');
         $bin_dir = $config->binDir();
+        $types = self::toolTypes($input);
         $required = $this->requiredInterface();
 
         $adapters = [];
-        foreach ($config->commandsFor((string) $this->getName()) as $class => $command) {
+        foreach ($config->commandsFor($this->configMode()) as $class => $command) {
             if (!\is_a($class, ToolAdapter::class, allow_string: true) || !new \ReflectionClass($class)->isInstantiable()) {
-                $this->warn($output, "'$class' is not a known ToolAdapter, skipping.");
+                $this->warn($output, "'{$class}' is not a known ToolAdapter, skipping.");
 
                 continue;
             }
 
             if (!\is_a($class, $required, allow_string: true)) {
-                $this->warn($output, "'$class' does not support '".$this->getName()."', skipping.");
-
-                continue;
-            }
-
-            $reason = Cli::unrunnableReason($command, $project, $bin_dir);
-            if ($reason !== null) {
-                $this->warn($output, "'$class' skipped, because $reason. Command: `$command`");
+                $this->warn($output, "'{$class}' does not support '".$this->getName()."', skipping.");
 
                 continue;
             }
 
             /* @var class-string<ToolAdapter> $class -- False positive from EA Inspections, despite the proper hinting in the method */
-            $adapters[$class] = new $class($project, $command, $full_scan, $bin_dir);
+            $adapter = new $class($project, $command, $full_scan, $bin_dir);
+            // Not an error: the tool is just not requested
+            if ($types !== [] && \array_intersect($types, \array_map(\mb_strtolower(...), $adapter->types())) === []) {
+                continue;
+            }
+
+            $reason = Cli::unrunnableReason($command, $project, $bin_dir);
+            if ($reason !== null) {
+                $this->warn($output, "'{$class}' skipped, because {$reason}. Command: `{$command}`");
+
+                continue;
+            }
+
+            $adapters[$class] = $adapter;
         }
 
         return $adapters;
+    }
+
+    /**
+     * Project directory from `--project`, or the current directory.
+     *
+     * @param InputInterface $input Input
+     *
+     * @return string
+     */
+    private static function projectDirectory(InputInterface $input): string
+    {
+        $raw = $input->getOption('project') ?? \getcwd();
+        $project = \is_string($raw)
+            ? \realpath($raw)
+            : false;
+        if (
+            $project === false
+            || !\is_dir($project)
+        ) {
+            throw new InvalidOptionException('Not a readable project directory.');
+        }
+
+        return $project;
+    }
+
+    /**
+     * Types from `--tool-type`.
+     *
+     * @param \Symfony\Component\Console\Input\InputInterface $input Input
+     *
+     * @return list<string> Types in lower case. An empty list means all the tools.
+     */
+    private static function toolTypes(InputInterface $input): array
+    {
+        $raw = $input->getOption('tool-type');
+
+        return \array_values(\array_unique(\array_filter(
+            \array_map(static fn(mixed $type): string => \is_string($type) ? \mb_strtolower(\trim($type), 'UTF-8') : '', \is_array($raw) ? $raw : []),
+            static fn(string $type): bool => $type !== '',
+        )));
+    }
+
+    /**
+     * Timeout from `--timeout`.
+     *
+     * @param InputInterface $input Input
+     *
+     * @return float|null Seconds, or null for no timeout
+     */
+    private static function timeout(InputInterface $input): ?float
+    {
+        $raw = $input->getOption('timeout');
+        if (
+            !\is_numeric($raw)
+            || (float) $raw < 0
+        ) {
+            throw new InvalidOptionException('Option `--timeout` needs a number of seconds, 0 or more.');
+        }
+
+        return (float) $raw > 0
+            ? (float) $raw
+            : null;
     }
 }

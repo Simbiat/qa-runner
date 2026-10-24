@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Adapters;
 
-use DOMDocument;
 use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
@@ -19,17 +18,14 @@ use TwigCsFixer\Rules\AbstractFixableRule;
 final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapter
 {
     /**
+     * Purpose of the tool.
+     */
+    protected const array TYPES = ['twig'];
+
+    /**
      * 0 - no violations, 1 - violations found. Anything else is a failure of the tool.
      */
     protected const array OK_EXIT_CODES = [0, 1];
-
-    /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'Twig CS Fixer';
-    }
 
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
@@ -40,7 +36,10 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      */
     public function buildCheckProcess(Paths $paths): Process
     {
-        if (!Cli::mentions($this->command, 'twig-cs-fixer check') && !Cli::mentions($this->command, 'twig-cs-fixer lint')) {
+        if (
+            !Cli::mentions($this->command, 'twig-cs-fixer check')
+            && !Cli::mentions($this->command, 'twig-cs-fixer lint')
+        ) {
             throw new \UnexpectedValueException('Not a Twig CS Fixer command');
         }
 
@@ -57,11 +56,22 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      */
     public function buildFixProcess(Paths $paths): Process
     {
-        if (!Cli::mentions($this->command, 'twig-cs-fixer') || !Cli::has($this->command, ['--fix'])) {
+        if (
+            !Cli::mentions($this->command, 'twig-cs-fixer')
+            || !Cli::has($this->command, ['--fix'])
+        ) {
             throw new \UnexpectedValueException('Not a Twig CS Fixer fix command');
         }
 
         return $this->shell($this->command, $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'Twig CS Fixer';
     }
 
     /**
@@ -80,7 +90,7 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
             return [];
         }
 
-        $dom = new DOMDocument();
+        $dom = new \DOMDocument();
         $previous = \libxml_use_internal_errors(use_errors: true);
         $loaded = $dom->loadXML($output);
         \libxml_clear_errors();

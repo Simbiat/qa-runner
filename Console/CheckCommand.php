@@ -30,10 +30,10 @@ final class CheckCommand extends AbstractQACommand
     /**
      * Available output formats.
      */
-    private const array FORMATS = ['ide', 'console'];
+    private const array FORMATS = ['ide', 'console', 'csv', 'tsv'];
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     #[\Override]
     protected function configure(): void
@@ -42,11 +42,13 @@ final class CheckCommand extends AbstractQACommand
         $this
             ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: '.\implode(' or ', self::FORMATS), 'ide', self::FORMATS)
             ->addOption('by-type', mode: InputOption::VALUE_NONE, description: 'Group findings by tool, type and rule instead of by file')
+            ->addOption('count', mode: InputOption::VALUE_NONE, description: 'Add a `Count` column with the number of findings of the same rule (only for `csv` and `tsv` formats)')
+            ->addOption('by-count', mode: InputOption::VALUE_NONE, description: 'Sort findings by `Count`, from the highest to the lowest. Implies `--count`')
             ->addOption('no-full-scan', mode: InputOption::VALUE_NONE, description: 'Let tools like PHPStan and Psalm scan only the given paths instead of the full project');
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     #[\Override]
     protected function requiredInterface(): string
@@ -55,13 +57,25 @@ final class CheckCommand extends AbstractQACommand
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     #[\Override]
     protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int
     {
         $by_type = (bool) $input->getOption('by-type');
-        $formatter = $this->formatter((string) $input->getOption('format'), $output->isDecorated(), $by_type);
+        $format = (string) $input->getOption('format');
+        $by_count = (bool) $input->getOption('by-count');
+        if ($by_count) {
+            $count = true;
+        } else {
+            $count = (bool) $input->getOption('count');
+        }
+        if ($count && !\in_array($format, ['csv', 'tsv'], strict: true)) {
+            $this->warn($output, '`--count` works only with `csv` and `tsv` formats, so it is ignored.');
+            $count = false;
+        }
+
+        $formatter = self::formatter($format, $output->isDecorated(), $by_type, $count);
 
         $result = new Check($adapters, $timeout)->run($paths);
 
@@ -71,7 +85,11 @@ final class CheckCommand extends AbstractQACommand
             $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: Severity::ERROR);
         }
 
-        $findings = $by_type ? Sorter::sortByType($findings) : Sorter::sortByFile($findings);
+        $findings = match (true) {
+            $by_count => Sorter::sortByCount($findings),
+            $by_type => Sorter::sortByType($findings),
+            default => Sorter::sortByFile($findings),
+        };
 
         $text = $formatter->format($findings);
         if ($text !== '') {
@@ -92,17 +110,18 @@ final class CheckCommand extends AbstractQACommand
      * @param string $name    Formatter name
      * @param bool   $colors  Whether the output supports colors
      * @param bool   $by_type Whether findings are grouped by tool, type and rule
+     * @param bool   $count   Whether `csv` and `tsv` formats have the `Count` column
      *
      * @return OutputFormatter
      */
-    private function formatter(string $name, bool $colors, bool $by_type): OutputFormatter
+    private static function formatter(string $name, bool $colors, bool $by_type, bool $count): OutputFormatter
     {
         return match ($name) {
             'ide' => new IDE(),
-            'csv' => new CSV(),
-            'tsv' => new TSV(),
+            'csv' => new CSV($count),
+            'tsv' => new TSV($count),
             'console' => new Console($colors, $by_type),
-            default => throw new InvalidOptionException("Unknown format '$name'. Available: ".\implode(', ', self::FORMATS)),
+            default => throw new InvalidOptionException("Unknown format '{$name}'. Available: ".\implode(', ', self::FORMATS)),
         };
     }
 }

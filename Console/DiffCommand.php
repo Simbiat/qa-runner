@@ -4,49 +4,69 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Console;
 
-use Simbiat\QARunner\Commands\Diff;
+use Simbiat\QARunner\Commands\Fix;
 use Simbiat\QARunner\Helpers\Paths;
-use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
+use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
  * Show what the fixers would change, without changing anything.
+ * The fixers run on temporary copies of the files, one after another, and the command shows one combined diff for each file.
  */
-#[AsCommand(name: 'diff', description: 'Show dry-run diffs from the tools, that support them')]
+#[AsCommand(name: 'diff', description: 'Show one combined diff of what the fixers would change (no file is changed)')]
 final class DiffCommand extends AbstractQACommand
 {
     /**
-     * @inheritDoc
+     * The fixers do the work, so the commands are the same as for `fix`.
+     *
+     * {@inheritDoc}
+     */
+    #[\Override]
+    protected function configMode(): string
+    {
+        return 'fix';
+    }
+
+    /**
+     * {@inheritDoc}
      */
     #[\Override]
     protected function requiredInterface(): string
     {
-        return DiffableToolAdapter::class;
+        return FixableToolAdapter::class;
     }
 
     /**
-     * @inheritDoc
+     * {@inheritDoc}
      */
     #[\Override]
     protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int
     {
-        /** @var array<string, DiffableToolAdapter> $adapters */
-        $result = new Diff($adapters, $timeout)->run($paths);
+        /** @var array<string, \Simbiat\QARunner\Interfaces\FixableToolAdapter> $adapters */
+        $fixer = new Fix($adapters, $timeout);
+        $run = $fixer->run($paths, apply: false);
 
-        foreach ($result->items as $tool => $diff) {
-            // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
-            $output->writeln("========= Start of $tool output =========\n\n$diff\n\n========= End of $tool output =========", OutputInterface::OUTPUT_RAW);
+        $failed = false;
+        foreach ($run->results as $result) {
+            if (!$result->success) {
+                $failed = true;
+                $this->error($output, $result->tool.': '.$result->output);
+            }
         }
 
-        foreach ($result->failures as $tool => $message) {
-            $this->error($output, "$tool: $message");
+        foreach ($run->errors as $error) {
+            $failed = true;
+            $this->error($output, $error);
         }
+
+        // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
+        $output->writeln(\implode("\n\n", $run->diffs), OutputInterface::OUTPUT_RAW);
 
         return match (true) {
-            $result->failures !== [] => self::EXIT_ERROR,
-            $result->items !== [] => self::FAILURE,
+            $failed => self::EXIT_ERROR,
+            $run->diffs !== [] => self::FAILURE,
             default => self::SUCCESS,
         };
     }

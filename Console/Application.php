@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Console;
 
 use Symfony\Component\Console\Application as SymfonyApplication;
+use Symfony\Component\Console\Exception\LogicException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Output\ConsoleOutputInterface;
 use Symfony\Component\Console\Output\OutputInterface;
@@ -17,7 +18,7 @@ final class Application extends SymfonyApplication
     /**
      * Class constructor.
      *
-     * @throws \Symfony\Component\Console\Exception\LogicException
+     * @throws LogicException
      */
     public function __construct()
     {
@@ -31,8 +32,8 @@ final class Application extends SymfonyApplication
     /**
      * Symfony Console exits with code 1 on any error, but 1 means "findings exist" for qa-runner. So errors (wrong options, unknown command, unexpected exceptions) exit with 2 instead.
      *
-     * @param \Symfony\Component\Console\Input\InputInterface   $input  Input
-     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
+     * @param InputInterface  $input  Input
+     * @param OutputInterface $output Output
      *
      * @return int
      */

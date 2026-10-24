@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Helpers;
 
 use JetBrains\PhpStorm\ExpectedValues;
+use Simbiat\QARunner\Interfaces\ToolAdapter;
 
 /**
  * Config class for QA Runner.
@@ -22,23 +23,23 @@ final readonly class Config
      */
     private function __construct(
         private array $data,
-        private string $project_root
+        private string $project_root,
     ) {}
 
     /**
-     * Attempt to get composer.json content from project root.
+     * Absolute path to the directory with binaries of Composer packages. Composer adds it to PATH for its scripts, so commands there use short names.
      *
-     * @param string $project_root Path to project root directory
-     *
-     * @throws \JsonException
+     * @return string
      */
-    public static function fromProjectRoot(string $project_root): self
+    public function binDir(): string
     {
-        $root = \rtrim($project_root, '/');
-        $file = $root.'/composer.json';
-        $data = \is_file($file) ? \json_decode((string) \file_get_contents($file), associative: true, depth: 512, flags: \JSON_THROW_ON_ERROR) : null;
+        $vendor = $this->data['config']['vendor-dir'] ?? 'vendor';
+        $bin = $this->data['config']['bin-dir'] ?? '{$vendor-dir}/bin';
+        $bin = \str_replace('{$vendor-dir}', \is_string($vendor) ? $vendor : 'vendor', \is_string($bin) ? $bin : 'vendor/bin');
 
-        return new self(\is_array($data) ? $data : [], $root);
+        return \str_starts_with($bin, '/')
+            ? \rtrim($bin, '/')
+            : $this->project_root.'/'.\trim($bin, '/');
     }
 
     /**
@@ -46,7 +47,7 @@ final readonly class Config
      *
      * @param string $mode Respective mode to get commands for
      *
-     * @return array<class-string<\Simbiat\QARunner\Interfaces\ToolAdapter>, string>
+     * @return array<class-string<ToolAdapter>, string>
      */
     public function commandsFor(#[ExpectedValues(['check', 'diff', 'fix'])] string $mode): array
     {
@@ -66,17 +67,21 @@ final readonly class Config
     }
 
     /**
-     * Absolute path to the directory with binaries of Composer packages. Composer adds it to PATH for its scripts, so commands there use short names.
+     * Attempt to get composer.json content from project root.
      *
-     * @return string
+     * @param string $project_root Path to project root directory
+     *
+     * @throws \JsonException
      */
-    public function binDir(): string
+    public static function fromProjectRoot(string $project_root): self
     {
-        $vendor = $this->data['config']['vendor-dir'] ?? 'vendor';
-        $bin = $this->data['config']['bin-dir'] ?? '{$vendor-dir}/bin';
-        $bin = \str_replace('{$vendor-dir}', \is_string($vendor) ? $vendor : 'vendor', \is_string($bin) ? $bin : 'vendor/bin');
+        $root = \rtrim($project_root, '/');
+        $file = $root.'/composer.json';
+        $data = \is_file($file)
+            ? \json_decode((string) \file_get_contents($file), associative: true, depth: 512, flags: \JSON_THROW_ON_ERROR)
+            : null;
 
-        return \str_starts_with($bin, '/') ? \rtrim($bin, '/') : $this->project_root.'/'.\trim($bin, '/');
+        return new self(\is_array($data) ? $data : [], $root);
     }
 
     /**
@@ -100,17 +105,25 @@ final readonly class Config
 
         [$script_name, $arguments] = \array_pad(\explode(' ', \substr($spec, 1), 2), 2, '');
         $script = $this->data['scripts'][$script_name] ?? null;
-        if (\is_array($script) && \count($script) === 1) {
+        if (
+            \is_array($script)
+            && \count($script) === 1
+        ) {
             $script = \reset($script);
         }
 
-        if (\is_string($script) && $depth < self::MAX_DEPTH) {
+        if (
+            \is_string($script)
+            && $depth < self::MAX_DEPTH
+        ) {
             $command = $this->resolveCommand($script, $depth + 1);
 
-            return $arguments === '' ? $command : $command.' '.$arguments;
+            return $arguments === ''
+                ? $command
+                : $command.' '.$arguments;
         }
 
-        \fwrite(\STDERR, "qa-runner: composer script '$script_name' not found (or not a plain string, or a single command in an array) for '$spec', using it literally.\n");
+        \fwrite(\STDERR, "qa-runner: composer script '{$script_name}' not found (or not a plain string, or a single command in an array) for '{$spec}', using it literally.\n");
 
         return $spec;
     }

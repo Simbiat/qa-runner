@@ -21,14 +21,6 @@ final readonly class Stan extends AbstractAdapter
     protected const array OK_EXIT_CODES = [0, 1];
 
     /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'PHPStan';
-    }
-
-    /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
      * @param Paths $paths Paths to be scanned. Taken from CLI.
@@ -46,6 +38,14 @@ final readonly class Stan extends AbstractAdapter
 
         // Enforce JSON format
         return $this->shell(Cli::setOption($command, '--error-format', 'json'), $this->full_scan ? null : $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'PHPStan';
     }
 
     /**

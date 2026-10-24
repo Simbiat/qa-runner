@@ -10,8 +10,8 @@ namespace Simbiat\QARunner\Entities;
 enum Severity: string
 {
     case ERROR = 'ERROR';
-    case WARNING = 'WARNING';
     case NOTICE = 'NOTICE';
+    case WARNING = 'WARNING';
 
     /**
      * Convert severity label of any tool to one of the known cases.

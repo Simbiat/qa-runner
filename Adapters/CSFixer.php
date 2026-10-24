@@ -7,27 +7,18 @@ namespace Simbiat\QARunner\Adapters;
 use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
-use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for PHP CS Fixer https://github.com/PHP-CS-Fixer/PHP-CS-Fixer.
  */
-final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
+final readonly class CSFixer extends AbstractAdapter implements FixableToolAdapter
 {
     /**
      * 0 - nothing to change, 8 - changes needed (dry-run). Other codes are errors: 4 - invalid files, 16 - configuration error, 32 - exception in a fixer.
      */
     protected const array OK_EXIT_CODES = [0, 8];
-
-    /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'PHP CS Fixer';
-    }
 
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
@@ -50,24 +41,7 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
         // Remove --stop-on-violation if present, since the goal is to get the whole list
         $command = Cli::strip($command, ['--stop-on-violation']);
 
-        return $this->shell($this->withDryRun($command), $paths);
-    }
-
-    /**
-     * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
-     *
-     * @param Paths $paths Paths to be scanned. Taken from CLI.
-     *
-     * @return Process
-     */
-    public function buildDiffProcess(Paths $paths): Process
-    {
-        $this->assertDryRun();
-
-        // Enforce text format and diff mode
-        $command = Cli::ensureFlag(Cli::setOption($this->command, '--format', 'txt'), '--diff');
-
-        return $this->shell($this->withDryRun($command), $paths);
+        return $this->shell(self::withDryRun($command), $paths);
     }
 
     /**
@@ -85,6 +59,14 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
 
         // Remove --dry-run flag
         return $this->shell(Cli::strip($this->command, ['--dry-run']), $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'PHP CS Fixer';
     }
 
     /**
@@ -122,7 +104,13 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
      */
     private function assertDryRun(): void
     {
-        if (!Cli::mentions($this->command, 'php-cs-fixer check') && (!Cli::mentions($this->command, 'php-cs-fixer fix') || !Cli::has($this->command, ['--dry-run']))) {
+        if (
+            !Cli::mentions($this->command, 'php-cs-fixer check')
+            && (
+                !Cli::mentions($this->command, 'php-cs-fixer fix')
+                || !Cli::has($this->command, ['--dry-run'])
+            )
+        ) {
             throw new \UnexpectedValueException('Not a CS Fixer dry-run command');
         }
     }
@@ -134,8 +122,10 @@ final readonly class CSFixer extends AbstractAdapter implements DiffableToolAdap
      *
      * @return string
      */
-    private function withDryRun(string $command): string
+    private static function withDryRun(string $command): string
     {
-        return Cli::mentions($command, 'php-cs-fixer fix') ? Cli::ensureFlag($command, '--dry-run') : $command;
+        return Cli::mentions($command, 'php-cs-fixer fix')
+            ? Cli::ensureFlag($command, '--dry-run')
+            : $command;
     }
 }

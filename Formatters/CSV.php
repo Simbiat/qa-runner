@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Formatters;
 
 use Simbiat\QARunner\Entities\Finding;
+use Simbiat\QARunner\Helpers\RuleCounter;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
 
 /**
@@ -12,6 +13,13 @@ use Simbiat\QARunner\Interfaces\OutputFormatter;
  */
 final readonly class CSV implements OutputFormatter
 {
+    /**
+     * @param bool $count Add the `Count` column: how many times the rule of the finding was found in total
+     */
+    public function __construct(
+        private bool $count = false,
+    ) {}
+
     /**
      * Main function to prepare the output.
      *
@@ -21,19 +29,24 @@ final readonly class CSV implements OutputFormatter
      */
     public function format(array $findings): string
     {
+        $counts = $this->count ? RuleCounter::count($findings) : [];
         $lines = [];
-        $lines[] = '"File","Line","Column","Tool","Fixable","Type","Message","Rule"';
+        $lines[] = '"File","Line","Column","Tool","Fixable","Type","Message","Rule"'.($this->count ? ',"Count"' : '');
         foreach ($findings as $finding) {
             $fields = [
-                $this->escapeField($finding->file),
+                self::escapeField($finding->file),
                 (string) $finding->line,
                 (string) $finding->column,
-                $this->escapeField($finding->tool),
+                self::escapeField($finding->tool),
                 $finding->fixable ? '"Y"' : '"N"',
-                $this->escapeField($finding->type->value),
-                $this->escapeField($finding->message),
-                $this->escapeField($finding->rule),
+                self::escapeField($finding->type->value),
+                self::escapeField($finding->message),
+                self::escapeField($finding->rule),
             ];
+            if ($this->count) {
+                $fields[] = (string) $counts[RuleCounter::key($finding)];
+            }
+
             $lines[] = \implode(',', $fields);
         }
 
@@ -47,7 +60,7 @@ final readonly class CSV implements OutputFormatter
      *
      * @return string
      */
-    private function escapeField(string $string): string
+    private static function escapeField(string $string): string
     {
         return '"'.\str_replace('"', '""', $string).'"';
     }

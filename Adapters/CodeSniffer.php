@@ -8,32 +8,28 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
-use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for PHP CodeSniffer https://github.com/PHPCSStandards/PHP_CodeSniffer (version 4.x).
  */
-final readonly class CodeSniffer extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
+final readonly class CodeSniffer extends AbstractAdapter implements FixableToolAdapter
 {
-    /**
-     * phpcs: 0 - nothing found, 1 - everything found can be fixed, 2 - something found cannot be fixed, 3 - combination of 1 and 2, everything else most likely a runtime error.
-     */
-    protected const array OK_EXIT_CODES = [0, 1, 2, 3];
-
     /**
      * phpcbf: 0 - nothing to fix, 1 - everything fixable was fixed. 2 means something is not fixable, everything else is either fixer error/conflict or runtime error.
      */
     protected const array FIX_OK_EXIT_CODES = [0, 1, 2];
 
     /**
-     * Display label used as Finding::tool.
+     * 16 - no files were checked: all the files are excluded by the ruleset, or do not match its extensions. phpcs and phpcbf both use it.
      */
-    public function name(): string
-    {
-        return 'PHP CodeSniffer';
-    }
+    protected const array NO_FILES_EXIT_CODES = [16];
+
+    /**
+     * phpcs: 0 - nothing found, 1 - everything found can be fixed, 2 - something found cannot be fixed, 3 - combination of 1 and 2, everything else most likely a runtime error.
+     */
+    protected const array OK_EXIT_CODES = [0, 1, 2, 3];
 
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
@@ -51,21 +47,6 @@ final readonly class CodeSniffer extends AbstractAdapter implements DiffableTool
     }
 
     /**
-     * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
-     *
-     * @param Paths $paths Paths to be scanned. Taken from CLI.
-     *
-     * @return Process
-     */
-    public function buildDiffProcess(Paths $paths): Process
-    {
-        $this->assertPhpcs();
-
-        // Enforce Diff format
-        return $this->shell(Cli::setOption($this->command, '--report', 'diff'), $paths);
-    }
-
-    /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
      * @param Paths $paths Paths to be processed. Taken from CLI.
@@ -79,6 +60,14 @@ final readonly class CodeSniffer extends AbstractAdapter implements DiffableTool
         }
 
         return $this->shell($this->command, $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'PHP CodeSniffer';
     }
 
     /**

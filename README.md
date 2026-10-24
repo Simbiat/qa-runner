@@ -40,8 +40,14 @@ Note, that you may not need the `/app` in prefix for the `Arguments` or `Output 
 
 The tool also supports 2 other commands besides `check`:
 
-1. `diff`: will output dry-run `diff` output from tools, that support it. Useful if you want an example of how a tool wants you to change the code. There is no extra parsing here, just raw output with some styling headers.
-2. `fix`: actually apply the fixes by tools, that support auto-fixes. There is no extra parsing here, just raw output with some styling headers.
+1. `diff`: shows what the fixers would change. The runner copies each file to a temporary file in the same directory. Then it runs the fixers on the copy, one after another. Each fixer gets the result of the previous one. The output is one combined unified diff for each file, not a separate output for each tool. The original files do not change, and the temporary files are removed at the end.
+2. `fix`: uses the same process as `diff`, but replaces each changed original file with its fixed copy. The output of each tool is shown with a styled header. The original file is not touched if it changed on the disk during the run (for example, you saved it in the IDE). In this case you get an error, and the fixes for this file are not applied.
+
+Both commands use the commands from the `fix` node of `composer.json` (see below). The order of the adapters in that node is the order in which the fixers run.
+
+The temporary file is in the same directory as the original, with a random part before the extension (`Foo.php` becomes `Foo.qa-runner-1a2b3c4d.php`). The reason: a copy outside the project would not match the filters of the tools. Rules that depend on the file name (for example, a class name that must match the file name) can see the temporary name. If the run is killed (`SIGKILL`), a temporary file can stay in the directory. Delete it by hand.
+
+Due to how they work, `diff` and `fix` accept only files, not directories. Each tool applies its own configuration to the file.
 
 ## Customization
 
@@ -49,7 +55,7 @@ While the QA Runner does not need a separate config file, it still requires some
 
 ### Tools selection
 
-Selection of tools (or rather their adapters) you want to run is done through `composer.json`'s `extra` node, where you add a `qa-runner` object with `check`, `diff` and `fix` attributes. Each of them should be a named array, where key names are fully qualified names of the adapters' classes, and their values are the exact commands to run. To better explain it, here's a snippet of `composer.json`:
+Selection of tools (or rather their adapters) you want to run is done through `composer.json`'s `extra` node, where you add a `qa-runner` object with `check` and `fix` attributes (`diff` uses the `fix` attribute). Each of them should be a named array, where key names are fully qualified names of the adapters' classes, and their values are the exact commands to run. To better explain it, here's a snippet of `composer.json`:
 
 ```json
 {
@@ -63,12 +69,6 @@ Selection of tools (or rather their adapters) you want to run is done through `c
                 "Simbiat\\QARunner\\Adapters\\MessDetector": "@phpmd",
                 "Simbiat\\QARunner\\Adapters\\Rector": "@rector",
                 "Simbiat\\QARunner\\Adapters\\TwigCS": "@twig-cs"
-            },
-            "diff": {
-                "Simbiat\\QARunner\\Adapters\\CodeSniffer": "@phpcs",
-                "Simbiat\\QARunner\\Adapters\\CSFixer": "@php-cs-fixer",
-                "Simbiat\\QARunner\\Adapters\\Psalm": "@psalter",
-                "Simbiat\\QARunner\\Adapters\\Rector": "@rector"
             },
             "fix": {
                 "Simbiat\\QARunner\\Adapters\\CodeSniffer": "@phpcbf",
@@ -106,7 +106,7 @@ The values use references to Composer's `scripts`, so that you do not need to du
 
 Only adapters listed in respective node will be run, when triggering respective node. In the example above Stan will not be triggered when running `diff` or `fix`, because adapter is not listed there (and because Stan does not have respective modes).
 
-While use of class names may not look pretty, this allows you to plug in any custom adapter that would implement `ToolAdapter` interface (and optionally `DiffableToolAdapter` and/or `FixableToolAdapter` interfaces) without waiting for an official support. Please, refer to existing adapters for pointers, if developing your own.
+While use of class names may not look pretty, this allows you to plug in any custom adapter that would implement `ToolAdapter` interface (and optionally `FixableToolAdapter` interface) without waiting for an official support. Please, refer to existing adapters for pointers, if developing your own.
 
 Of course, any of the respective tools being called by the adapter will need to be installed first. Installation is not done by QA Runner. If a tool is not installed respective call will fail.
 
@@ -121,6 +121,24 @@ QA Runner supports several flags:
 #### --project=<path>
 
 By default, all tools will run in current directory assuming that's your project's directory. Use `--project` to change it.
+
+#### --tool-type=<type>
+
+Each adapter has a type that describes its purpose: by default it is `php`, and for the bundled ones only exception is Twig CS Fixer, which has `twig`. The value is not a file extension, and it can be any string. An adapter can have several types.
+
+By default, all the tools from the selected node of `composer.json` run. This is correct when you scan the whole project, but may not be the case for a single file or directory. For example, PHP tools must not run on `/templates`. Use `--tool-type` to run only the tools that have the type you give:
+
+```console
+vendor/bin/qa-runner check --tool-type=twig /app/templates/index.html.twig
+```
+
+You can use the flag several times. A tool runs if it has any of the types:
+
+```console
+vendor/bin/qa-runner check --tool-type=php --tool-type=twig /app/src /app/templates
+```
+
+If no tool matches, QA Runner shows an error.
 
 #### --format=<format>
 
@@ -143,6 +161,14 @@ Select output format. 4 options are supported: `ide` (default), `console`, `csv`
 `csv` and `tsv` will generate Comma-Separated Values and Tab-Separated Values respectively. CSV is compliant with RFC 4180, TSV is treated in similar way, but with tabs as delimiters.
 
 Applicable only to `check` mode.
+
+#### --count
+
+Only for `csv` and `tsv` formats. Adds the `Count` column to each line. It has the number of findings of the same rule in the whole output. A rule is identified by the tool and the rule name. With other formats the flag is ignored and you get a warning.
+
+#### --by-count
+
+Implies `--count`. Sorts the findings by `Count`, from the highest to the lowest. Findings with the same count are sorted as with `--by-type`. Without `--count` the flag is ignored and you get a warning.
 
 #### --by-type
 

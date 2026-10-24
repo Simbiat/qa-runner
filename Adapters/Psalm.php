@@ -8,14 +8,13 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
-use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for Psalm https://github.com/vimeo/psalm/.
  */
-final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
+final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
 {
     /**
      * 0 - no issues, 2 - issues found. 1 is a failure of the tool (for example, bad configuration).
@@ -48,14 +47,6 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
     ];
 
     /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'Psalm';
-    }
-
-    /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
      * @param Paths $paths Paths to be scanned. Taken from CLI.
@@ -75,24 +66,6 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
     }
 
     /**
-     * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
-     *
-     * @param Paths $paths Paths to be scanned. Taken from CLI.
-     *
-     * @return Process
-     */
-    public function buildDiffProcess(Paths $paths): Process
-    {
-        $this->assertPsalter();
-
-        // Force dry-run and add issues list, if not provided
-        $command = Cli::ensureFlag($this->command, '--dry-run');
-        $command = Cli::has($command, ['--issues']) ? $command : $command.' --issues=all';
-
-        return $this->shell($command, $paths);
-    }
-
-    /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
      * @param Paths $paths Paths to be processed. Taken from CLI.
@@ -105,9 +78,19 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
 
         // Remove --dry-run flag and add issues list, if not provided
         $command = Cli::strip($this->command, ['--dry-run']);
-        $command = Cli::has($command, ['--issues']) ? $command : $command.' --issues=all';
+        $command = Cli::has($command, ['--issues'])
+            ? $command
+            : $command.' --issues=all';
 
         return $this->shell($command, $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'Psalm';
     }
 
     /**
@@ -151,7 +134,13 @@ final readonly class Psalm extends AbstractAdapter implements DiffableToolAdapte
      */
     private function assertPsalter(): void
     {
-        if (!Cli::mentions($this->command, 'psalter') && (!Cli::mentions($this->command, 'psalm') || !Cli::has($this->command, ['--alter']))) {
+        if (
+            !Cli::mentions($this->command, 'psalter')
+            && (
+                !Cli::mentions($this->command, 'psalm')
+                || !Cli::has($this->command, ['--alter'])
+            )
+        ) {
             throw new \UnexpectedValueException('Not a Psalter command');
         }
     }

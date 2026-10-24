@@ -14,6 +14,19 @@ use Symfony\Component\Process\Process;
 final class FailureMessage
 {
     /**
+     * The process ended, but its result was not accepted: the exit code is not an expected one, or the output cannot be parsed.
+     *
+     * @param Process    $process Process, that has ended
+     * @param \Throwable $reason  What happened
+     *
+     * @return string
+     */
+    public static function forParse(Process $process, \Throwable $reason): string
+    {
+        return self::wrap($process, $reason instanceof ToolFailure ? $reason->getMessage() : 'Failed to parse the output: '.$reason->getMessage());
+    }
+
+    /**
      * The process did not start, did not end properly, or timed out.
      *
      * @param Process    $process Process, that was run
@@ -28,19 +41,6 @@ final class FailureMessage
             : $reason->getMessage();
 
         return self::wrap($process, $text);
-    }
-
-    /**
-     * The process ended, but its result was not accepted: the exit code is not an expected one, or the output cannot be parsed.
-     *
-     * @param Process    $process Process, that has ended
-     * @param \Throwable $reason  What happened
-     *
-     * @return string
-     */
-    public static function forParse(Process $process, \Throwable $reason): string
-    {
-        return self::wrap($process, $reason instanceof ToolFailure ? $reason->getMessage() : 'Failed to parse the output: '.$reason->getMessage());
     }
 
     /**

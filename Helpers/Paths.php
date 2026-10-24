@@ -13,32 +13,25 @@ final readonly class Paths
      * @param list<string> $absolute Absolute canonical paths
      */
     private function __construct(
-        public array $absolute
+        public array $absolute,
     ) {}
 
     /**
-     * Resolve paths against the current directory.
+     * Check if the file is one of the paths or is inside one of them.
      *
-     * @param array<string> $raw Paths as they came from CLI
-     * @param string        $cwd Directory to resolve relative paths against
+     * @param string $file File path as returned by a tool
      *
-     * @return self
-     *
-     * @throws \InvalidArgumentException If a path does not exist or is not readable
+     * @return bool
      */
-    public static function fromCli(array $raw, string $cwd): self
+    public function covers(string $file): bool
     {
-        $absolute = [];
-        foreach ($raw as $path) {
-            $real = \realpath(\str_starts_with($path, '/') ? $path : \mb_rtrim($cwd, '/', 'UTF-8').'/'.$path);
-            if ($real === false || !\is_readable($real)) {
-                throw new \InvalidArgumentException('Not a readable path: '.$path);
-            }
-
-            $absolute[] = $real;
+        if ($this->matches($file)) {
+            return true;
         }
 
-        return new self(\array_values(\array_unique($absolute)));
+        $real = \realpath($file);
+
+        return $real !== false && $this->matches($real);
     }
 
     /**
@@ -62,21 +55,31 @@ final readonly class Paths
     }
 
     /**
-     * Check if the file is one of the paths or is inside one of them.
+     * Resolve paths against the current directory.
      *
-     * @param string $file File path as returned by a tool
+     * @param array<string> $raw Paths as they came from CLI
+     * @param string        $cwd Directory to resolve relative paths against
      *
-     * @return bool
+     * @return self
+     *
+     * @throws \InvalidArgumentException If a path does not exist or is not readable
      */
-    public function covers(string $file): bool
+    public static function fromCli(array $raw, string $cwd): self
     {
-        if ($this->matches($file)) {
-            return true;
+        $absolute = [];
+        foreach ($raw as $path) {
+            $real = \realpath(\str_starts_with($path, '/') ? $path : \mb_rtrim($cwd, '/', 'UTF-8').'/'.$path);
+            if (
+                $real === false
+                || !\is_readable($real)
+            ) {
+                throw new \InvalidArgumentException('Not a readable path: '.$path);
+            }
+
+            $absolute[] = $real;
         }
 
-        $real = \realpath($file);
-
-        return $real !== false && $this->matches($real);
+        return new self(\array_values(\array_unique($absolute)));
     }
 
     /**

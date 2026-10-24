@@ -16,11 +16,6 @@ use Symfony\Component\Process\Process;
 interface ToolAdapter
 {
     /**
-     * Display label used as Finding::tool, e.g. 'PHP CodeSniffer'.
-     */
-    public function name(): string;
-
-    /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
      * @param Paths $paths Paths to be scanned. Taken from CLI.
@@ -32,6 +27,19 @@ interface ToolAdapter
     public function buildCheckProcess(Paths $paths): Process;
 
     /**
+     * Display label used as Finding::tool, e.g. 'PHP CodeSniffer'.
+     */
+    public function name(): string;
+
+    /**
+     * Types of the tool, for example `php` or `twig`. They describe the purpose of the tool, not file extensions, and can be any strings.
+     * When `--tool-type` is used, the tool runs only if it has at least one of the requested types.
+     *
+     * @return array<string>
+     */
+    public function types(): array;
+
+    /**
      * Parse the tool output.
      *
      * @param Process $process Symfony's Process instance, that has ended
@@ -39,7 +47,7 @@ interface ToolAdapter
      *
      * @return array<Finding>
      *
-     * @throws ToolFailure    If the tool did not run properly
+     * @throws ToolFailure If the tool did not run properly
      */
     public function parseCheck(Process $process, Paths $paths): array;
 }

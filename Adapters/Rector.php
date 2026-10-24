@@ -4,31 +4,21 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Adapters;
 
-use ReflectionClass;
 use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
-use Simbiat\QARunner\Interfaces\DiffableToolAdapter;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Process;
 
 /**
  * Adapter for Rector https://github.com/rectorphp/rector.
  */
-final readonly class Rector extends AbstractAdapter implements DiffableToolAdapter, FixableToolAdapter
+final readonly class Rector extends AbstractAdapter implements FixableToolAdapter
 {
     /**
      * 0 - nothing to change, 2 - changes needed (dry-run). 1 is a failure of the tool.
      */
     protected const array OK_EXIT_CODES = [0, 2];
-
-    /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'Rector';
-    }
 
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
@@ -48,23 +38,6 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
     }
 
     /**
-     * Method to prepare Diff command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
-     *
-     * @param Paths $paths Paths to be scanned. Taken from CLI.
-     *
-     * @return Process
-     */
-    public function buildDiffProcess(Paths $paths): Process
-    {
-        $this->assertRector();
-
-        // Enforce console format with diffs and force dry-run
-        $command = Cli::setOption(Cli::strip($this->command, ['--no-diffs']), '--output-format', 'console');
-
-        return $this->shell(Cli::ensureFlag($command, '--dry-run'), $paths);
-    }
-
-    /**
      * Method to prepare fix command. Adapter appends whatever flags *it* needs for the fix, then the paths.
      *
      * @param Paths $paths Paths to be processed. Taken from CLI.
@@ -79,6 +52,14 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
         $command = Cli::setOption(Cli::strip($this->command, ['--no-diffs', '--dry-run']), '--output-format', 'console');
 
         return $this->shell($command, $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'Rector';
     }
 
     /**
@@ -100,7 +81,7 @@ final readonly class Rector extends AbstractAdapter implements DiffableToolAdapt
                 $rector = (string) ($finding['rector'] ?? 'unknown');
 
                 try {
-                    $description = new ReflectionClass($rector)->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
+                    $description = new \ReflectionClass($rector)->newInstanceWithoutConstructor()->getRuleDefinition()->getDescription();
                 } catch (\Throwable) {
                     $description = '';
                 }

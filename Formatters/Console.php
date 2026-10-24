@@ -19,8 +19,8 @@ final readonly class Console implements OutputFormatter
      */
     private const array COLORS = [
         'ERROR' => 'red',
-        'WARNING' => 'yellow',
         'NOTICE' => 'cyan',
+        'WARNING' => 'yellow',
     ];
 
     /**
@@ -29,7 +29,7 @@ final readonly class Console implements OutputFormatter
      */
     public function __construct(
         private bool $colors = true,
-        private bool $by_rule = false
+        private bool $by_rule = false,
     ) {}
 
     /**
@@ -47,7 +47,9 @@ final readonly class Console implements OutputFormatter
         $notch_rule = null;
 
         foreach ($findings as $finding) {
-            $outer = $this->by_rule ? $finding->tool : $finding->file;
+            $outer = $this->by_rule
+                ? $finding->tool
+                : $finding->file;
             if ($outer !== $notch_outer) {
                 if ($notch_outer !== null) {
                     $lines[] = '';
@@ -98,6 +100,8 @@ final readonly class Console implements OutputFormatter
      */
     private function color(string $text, Severity $type): string
     {
-        return $this->colors ? new OutputFormatterStyle(self::COLORS[$type->value])->apply($text) : $text;
+        return $this->colors
+            ? new OutputFormatterStyle(self::COLORS[$type->value])->apply($text)
+            : $text;
     }
 }

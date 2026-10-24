@@ -11,6 +11,22 @@ namespace Simbiat\QARunner\Helpers;
 final class Cli
 {
     /**
+     * Add the flag, if the command does not have it (or any of its aliases) already.
+     *
+     * @param string        $command Command line
+     * @param string        $name    Flag name, with dashes
+     * @param array<string> $aliases Other names of the same flag
+     *
+     * @return string
+     */
+    public static function ensureFlag(string $command, string $name, array $aliases = []): string
+    {
+        return self::has($command, [$name, ...$aliases])
+            ? $command
+            : $command.' '.$name;
+    }
+
+    /**
      * Check if the command has any of the options. Both `--name` and `--name=value` forms match.
      *
      * @param string        $command Command line
@@ -20,7 +36,7 @@ final class Cli
      */
     public static function has(string $command, array $names): bool
     {
-        return array_any($names, fn(string $name): bool => \preg_match(self::pattern($name), $command) === 1);
+        return \array_any($names, static fn(string $name): bool => \preg_match(self::pattern($name), $command) === 1);
     }
 
     /**
@@ -33,7 +49,44 @@ final class Cli
      */
     public static function mentions(string $command, string ...$needles): bool
     {
-        return array_all($needles, fn(string $needle): bool => \stripos($command, $needle) !== false);
+        return \array_all($needles, static fn(string $needle): bool => \stripos($command, $needle) !== false);
+    }
+
+    /**
+     * Program, that the command line starts with. Variable assignments in front of it are skipped, and quotes are removed.
+     *
+     * @param string $command Command line
+     *
+     * @return string|null Null if the program cannot be told without a shell (variables, substitutions, `@` references, operators right after the word)
+     */
+    public static function program(string $command): ?string
+    {
+        $command = \ltrim($command);
+        while (\preg_match('/^[A-Za-z_]\w*=(?:\'[^\']*\'|"[^"]*"|\S*)\s+/', $command, $matches) === 1) {
+            $command = \substr($command, \strlen($matches[0]));
+        }
+
+        foreach (['/^\'([^\']+)\'(?=\s|$)/', '/^"([^"$`\\\\]+)"(?=\s|$)/', '/^([^\s;&|<>(){}$`\\\\"\'*?\[~#@]+)(?=\s|$)/'] as $pattern) {
+            if (\preg_match($pattern, $command, $matches) === 1) {
+                return $matches[1];
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Set the value of the option, replacing any existing value.
+     *
+     * @param string $command Command line
+     * @param string $name    Option name, with dashes
+     * @param string $value   New value
+     *
+     * @return string
+     */
+    public static function setOption(string $command, string $name, string $value): string
+    {
+        return self::strip($command, [$name]).' '.$name.'='.$value;
     }
 
     /**
@@ -54,70 +107,22 @@ final class Cli
     }
 
     /**
-     * Set the value of the option, replacing any existing value.
-     *
-     * @param string $command Command line
-     * @param string $name    Option name, with dashes
-     * @param string $value   New value
-     *
-     * @return string
-     */
-    public static function setOption(string $command, string $name, string $value): string
-    {
-        return self::strip($command, [$name]).' '.$name.'='.$value;
-    }
-
-    /**
-     * Add the flag, if the command does not have it (or any of its aliases) already.
-     *
-     * @param string        $command Command line
-     * @param string        $name    Flag name, with dashes
-     * @param array<string> $aliases Other names of the same flag
-     *
-     * @return string
-     */
-    public static function ensureFlag(string $command, string $name, array $aliases = []): string
-    {
-        return self::has($command, [$name, ...$aliases]) ? $command : $command.' '.$name;
-    }
-
-    /**
-     * Program, that the command line starts with. Variable assignments in front of it are skipped, and quotes are removed.
-     *
-     * @param string $command Command line
-     *
-     * @return null|string Null if the program cannot be told without a shell (variables, substitutions, `@` references, operators right after the word)
-     */
-    public static function program(string $command): ?string
-    {
-        $command = \ltrim($command);
-        while (\preg_match('/^[A-Za-z_]\w*=(?:\'[^\']*\'|"[^"]*"|\S*)\s+/', $command, $matches) === 1) {
-            $command = \substr($command, \strlen($matches[0]));
-        }
-
-        foreach (['/^\'([^\']+)\'(?=\s|$)/', '/^"([^"$`\\\\]+)"(?=\s|$)/', '/^([^\s;&|<>(){}$`\\\\"\'*?\[~#@]+)(?=\s|$)/'] as $pattern) {
-            if (\preg_match($pattern, $command, $matches) === 1) {
-                return $matches[1];
-            }
-        }
-
-        return null;
-    }
-
-    /**
      * Check if the program of the command can be run: it exists and has the permission to be executed.
      * The lookup is the same as the one of the process: the binaries directory first, then PATH. Not checked on Windows.
      *
      * @param string      $command      Command line
      * @param string      $project_root Project root, that relative paths are resolved against
-     * @param null|string $bin_dir      Directory with binaries of Composer packages
+     * @param string|null $bin_dir      Directory with binaries of Composer packages
      *
-     * @return null|string Reason, why the program cannot be run. Null if it can, or if it cannot be checked.
+     * @return string|null Reason, why the program cannot be run. Null if it can, or if it cannot be checked.
      */
     public static function unrunnableReason(string $command, string $project_root, ?string $bin_dir): ?string
     {
         $program = self::program($command);
-        if ($program === null || \PHP_OS_FAMILY === 'Windows') {
+        if (
+            $program === null
+            || \PHP_OS_FAMILY === 'Windows'
+        ) {
             return null;
         }
 
@@ -144,7 +149,9 @@ final class Cli
             $not_executable ??= $candidate;
         }
 
-        return $not_executable === null ? "'$program' was not found" : "'$not_executable' is not executable";
+        return $not_executable === null
+            ? "'{$program}' was not found"
+            : "'{$not_executable}' is not executable";
     }
 
     /**

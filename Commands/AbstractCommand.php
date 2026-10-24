@@ -17,7 +17,7 @@ abstract readonly class AbstractCommand
 {
     /**
      * @param array<string, ToolAdapter> $adapters List of adapters to use. They must support the command.
-     * @param null|float                 $timeout  Timeout in seconds for each tool. Null means no timeout.
+     * @param float|null                 $timeout  Timeout in seconds for each tool. Null means no timeout.
      */
     public function __construct(
         protected array  $adapters,

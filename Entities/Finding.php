@@ -10,14 +10,14 @@ namespace Simbiat\QARunner\Entities;
 final readonly class Finding
 {
     /**
-     * @var int Line, where the finding is. Always 1 or more.
-     */
-    public int $line;
-
-    /**
      * @var int Column, where the finding is. Always 1 or more.
      */
     public int $column;
+
+    /**
+     * @var int Line, where the finding is. Always 1 or more.
+     */
+    public int $line;
 
     /**
      * @var string Finding description, always on a single line.

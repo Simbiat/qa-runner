@@ -21,14 +21,6 @@ final readonly class MessDetector extends AbstractAdapter
     protected const array OK_EXIT_CODES = [0, 2, 3];
 
     /**
-     * Display label used as Finding::tool.
-     */
-    public function name(): string
-    {
-        return 'PHP Mess Detector';
-    }
-
-    /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
      *
      * @param Paths $paths Paths to be scanned. Taken from CLI.
@@ -46,6 +38,14 @@ final readonly class MessDetector extends AbstractAdapter
 
         // Enforce JSON format
         return $this->shell(Cli::setOption($command, '--format', 'json'), $paths);
+    }
+
+    /**
+     * Display label used as Finding::tool.
+     */
+    public function name(): string
+    {
+        return 'PHP Mess Detector';
     }
 
     /**
@@ -78,25 +78,21 @@ final readonly class MessDetector extends AbstractAdapter
         // Files, that PHPMD could not process (for example, because of syntax errors)
         foreach ($data['errors'] ?? [] as $error) {
             if ($error['fileName'] === '') {
-                if (\preg_match('/^(?<message>.+?),\s*line:\s*(?<line>\d+)(?:,\s*col:\s*(?<col>\d+))?,\s*file:\s*(?<file>.+?)\.?\\n.*/uir', $error['message'] ?? '', $matches) === 1) {
-                    $findings[] = new Finding(
-                        tool: $this->name(),
-                        rule: 'processing-error',
-                        file: $matches['file'] ?? '',
-                        line: (int) $matches['line'],
-                        column: (int) $matches['col'],
-                        message: $matches['message'] ?? '',
-                        type: Severity::ERROR,
-                    );
-                } else {
-                    $findings[] = new Finding(
-                        tool: $this->name(),
-                        rule: 'processing-error',
-                        file: '',
-                        message: $error['message'] ?? '',
-                        type: Severity::ERROR,
-                    );
-                }
+                $findings[] = \preg_match('/^(?<message>.+?),\s*line:\s*(?<line>\d+)(?:,\s*col:\s*(?<col>\d+))?,\s*file:\s*(?<file>.+?)\.?\\n.*/uir', $error['message'] ?? '', $matches) === 1 ? new Finding(
+                    tool: $this->name(),
+                    rule: 'processing-error',
+                    file: $matches['file'] ?? '',
+                    line: (int) $matches['line'],
+                    column: (int) $matches['col'],
+                    message: $matches['message'] ?? '',
+                    type: Severity::ERROR,
+                ) : new Finding(
+                    tool: $this->name(),
+                    rule: 'processing-error',
+                    file: '',
+                    message: $error['message'] ?? '',
+                    type: Severity::ERROR,
+                );
             } else {
                 $findings[] = new Finding(
                     tool: $this->name(),
