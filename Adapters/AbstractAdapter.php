@@ -9,10 +9,13 @@ use Simbiat\QARunner\Entities\FixResult;
 use Simbiat\QARunner\Exceptions\ToolFailure;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\ToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
  * Code, that all adapters share: constructor, process creation, exit code checks and the default parsing of `diff` and `fix` results.
+ *
+ * @api
  */
 abstract readonly class AbstractAdapter implements ToolAdapter
 {
@@ -34,14 +37,14 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     protected const array OK_EXIT_CODES = [0];
 
     /**
-     * Maximum length of the tool output, that goes to a failure message.
-     */
-    private const int MESSAGE_LIMIT = 500;
-
-    /**
      * Types of the tool (its purpose, not file extensions). Used by `--tool-type`.
      */
     protected const array TYPES = ['php'];
+
+    /**
+     * Maximum length of the tool output, that goes to a failure message.
+     */
+    private const int MESSAGE_LIMIT = 500;
 
     /**
      * @param string      $project_root Path to project root
@@ -57,25 +60,17 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     ) {}
 
     /**
-     * Types of the tool.
-     *
-     * @return array<string>
-     */
-    final public function types(): array
-    {
-        return static::TYPES;
-    }
-
-    /**
      * Parse the tool output.
      *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance, that has ended
-     * @param \Simbiat\QARunner\Helpers\Paths    $paths   Paths to be scanned
+     * @param Process $process Symfony's Process instance, that has ended
+     * @param Paths   $paths   Paths to be scanned
      *
-     * @return array<\Simbiat\QARunner\Entities\Finding>
+     * @return array<Finding>
      *
-     * @throws \JsonException|\RuntimeException|\Simbiat\QARunner\Exceptions\ToolFailure
+     * @throws \JsonException|\RuntimeException|ToolFailure
+     * @throws LogicException
      */
+    #[\Override]
     final public function parseCheck(Process $process, Paths $paths): array
     {
         if ($this->hadNoFiles($process)) {
@@ -96,15 +91,27 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      * @return FixResult
      *
      * @noinspection PhpUnusedParameterInspection $paths can be used by overriden versions of the function.
+     *
+     * @throws LogicException
      */
     final public function parseFix(Process $process, Paths $paths): FixResult
     {
-        /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
         return new FixResult(
             tool: $this->name(),
-            success: $this->hadNoFiles($process) || \in_array($process->getExitCode(), static::FIX_OK_EXIT_CODES, strict: true),
+            success: $this->hadNoFiles($process) || \in_array($process->getExitCode(), $this::FIX_OK_EXIT_CODES, strict: true),
             output: \trim($process->getOutput()."\n".$process->getErrorOutput()),
         );
+    }
+
+    /**
+     * Types of the tool.
+     *
+     * @return array<string>
+     */
+    #[\Override]
+    final public function types(): array
+    {
+        return $this::TYPES;
     }
 
     /**
@@ -116,20 +123,9 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      */
     protected function absolute(string $path): string
     {
-        return $path !== '' && !\str_starts_with($path, '/') ? $this->project_root.'/'.$path : $path;
-    }
-
-    /**
-     * Check if the tool ended with an exit code, that means it had no files to process.
-     *
-     * @param \Symfony\Component\Process\Process $process Symfony's Process instance, that has ended
-     *
-     * @return bool
-     */
-    protected function hadNoFiles(Process $process): bool
-    {
-        /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
-        return \in_array($process->getExitCode(), static::NO_FILES_EXIT_CODES, strict: true);
+        return $path !== '' && !\str_starts_with($path, '/')
+            ? $this->project_root.'/'.$path
+            : $path;
     }
 
     /**
@@ -137,15 +133,15 @@ abstract readonly class AbstractAdapter implements ToolAdapter
      *
      * @param Process $process Symfony's Process instance, that has ended
      *
+     * @throws LogicException
      * @throws ToolFailure
      */
     protected function assertExitCode(Process $process): void
     {
         $code = $process->getExitCode();
-        /* @noinspection InArrayMissUseInspection Direct comparison is not suitable, since the array with exit codes can be overriden */
         if (
             $code !== null
-            && \in_array($code, static::OK_EXIT_CODES, strict: true)
+            && \in_array($code, $this::OK_EXIT_CODES, strict: true)
         ) {
             return;
         }
@@ -159,7 +155,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
 
         throw new ToolFailure(
             ($code === null ? 'Process did not finish' : 'Exit code '.$code.($code === 127 ? ' (command not found?)' : ''))
-            .($details === '' ? '' : ': '.$details)
+            .($details === '' ? '' : ': '.$details),
         );
     }
 
@@ -198,12 +194,26 @@ abstract readonly class AbstractAdapter implements ToolAdapter
     abstract protected function extractFindings(string $output, Paths $paths): array;
 
     /**
+     * Check if the tool ended with an exit code, that means it had no files to process.
+     *
+     * @param Process $process Symfony's Process instance, that has ended
+     *
+     * @return bool
+     */
+    protected function hadNoFiles(Process $process): bool
+    {
+        return \in_array($process->getExitCode(), $this::NO_FILES_EXIT_CODES, strict: true);
+    }
+
+    /**
      * Create the process. The tools run in the project root, with the binaries directory of Composer in PATH.
      *
      * @param string     $command Command line
      * @param Paths|null $paths   Paths to append to the command. Null if the command must run without paths.
      *
      * @return Process
+     *
+     * @throws LogicException
      */
     protected function shell(string $command, ?Paths $paths): Process
     {

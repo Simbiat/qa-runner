@@ -39,6 +39,7 @@ final readonly class Console implements OutputFormatter
      *
      * @return string
      */
+    #[\Override]
     public function format(array $findings): string
     {
         $lines = [];

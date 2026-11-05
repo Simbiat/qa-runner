@@ -26,7 +26,10 @@ final class ColorDiff
         $lines = \preg_split('/\R/', OutputFormatter::escape(\rtrim($diff))) ?: [];
         $result = [];
         foreach ($lines as $line) {
-            if (\str_starts_with($line, '--- ') || \str_starts_with($line, '+++ ')) {
+            if (
+                \str_starts_with($line, '--- ')
+                || \str_starts_with($line, '+++ ')
+            ) {
                 continue;
             }
 

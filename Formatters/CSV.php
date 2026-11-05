@@ -27,9 +27,12 @@ final readonly class CSV implements OutputFormatter
      *
      * @return string
      */
+    #[\Override]
     public function format(array $findings): string
     {
-        $counts = $this->count ? RuleCounter::count($findings) : [];
+        $counts = $this->count
+            ? RuleCounter::count($findings)
+            : [];
         $lines = [];
         $lines[] = '"File","Line","Column","Tool","Fixable","Type","Message","Rule"'.($this->count ? ',"Count"' : '');
         foreach ($findings as $finding) {

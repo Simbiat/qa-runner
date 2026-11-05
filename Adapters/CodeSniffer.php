@@ -9,6 +9,7 @@ use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -37,7 +38,11 @@ final readonly class CodeSniffer extends AbstractAdapter implements FixableToolA
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         $this->assertPhpcs();
@@ -52,7 +57,11 @@ final readonly class CodeSniffer extends AbstractAdapter implements FixableToolA
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildFixProcess(Paths $paths): Process
     {
         if (!Cli::mentions($this->command, 'phpcbf')) {
@@ -65,6 +74,7 @@ final readonly class CodeSniffer extends AbstractAdapter implements FixableToolA
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'PHP CodeSniffer';
@@ -80,6 +90,7 @@ final readonly class CodeSniffer extends AbstractAdapter implements FixableToolA
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $findings = [];

@@ -15,7 +15,7 @@ final class RuleCounter
     /**
      * Count the findings of each rule.
      *
-     * @param array<array-key, \Simbiat\QARunner\Entities\Finding> $findings List of findings
+     * @param array<array-key, Finding> $findings List of findings
      *
      * @return array<string, int> Key from `key()` => number of findings
      */
@@ -34,7 +34,7 @@ final class RuleCounter
     /**
      * Key of the rule of the finding.
      *
-     * @param \Simbiat\QARunner\Entities\Finding $finding Finding
+     * @param Finding $finding Finding
      *
      * @return string
      */

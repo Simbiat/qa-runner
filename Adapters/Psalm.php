@@ -9,6 +9,7 @@ use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -22,7 +23,7 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
     protected const array OK_EXIT_CODES = [0, 2];
 
     /**
-     * Fixable errors' types, taken from https://psalm.dev/docs/manipulating_code/fixing/.
+     * Fixable errors' types, based on setIssuesToFix() method from Psalm's ProjectAnalyzer.php.
      */
     private const array FIXABLE_ERRORS = [
         'MissingReturnType',
@@ -30,6 +31,7 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
         'InvalidReturnType',
         'InvalidNullableReturnType',
         'InvalidFalsableReturnType',
+        'MissingOverrideAttribute',
         'MissingParamType',
         'MissingPropertyType',
         'MismatchingDocblockParamType',
@@ -44,6 +46,12 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
         'UnusedVariable',
         'UnnecessaryVarAnnotation',
         'ParamNameMismatch',
+        'ClassMustBeFinal',
+        'RedundantCast',
+        'RedundantCastGivenDocblockType',
+        'MissingPureAnnotation',
+        'MissingThrowsDocblock',
+        'MissingImmutableAnnotation',
     ];
 
     /**
@@ -52,7 +60,11 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         if (!Cli::mentions($this->command, 'psalm')) {
@@ -71,7 +83,11 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildFixProcess(Paths $paths): Process
     {
         $this->assertPsalter();
@@ -88,6 +104,7 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'Psalm';
@@ -103,6 +120,7 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $findings = [];

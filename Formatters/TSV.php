@@ -27,9 +27,12 @@ final readonly class TSV implements OutputFormatter
      *
      * @return string
      */
+    #[\Override]
     public function format(array $findings): string
     {
-        $counts = $this->count ? RuleCounter::count($findings) : [];
+        $counts = $this->count
+            ? RuleCounter::count($findings)
+            : [];
         $lines = [];
         $lines[] = "\"File\"\t\"Line\"\t\"Column\"\t\"Tool\"\t\"Fixable\"\t\"Type\"\t\"Message\"\t\"Rule\"".($this->count ? "\t\"Count\"" : '');
         foreach ($findings as $finding) {

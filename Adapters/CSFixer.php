@@ -8,6 +8,7 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -26,7 +27,11 @@ final readonly class CSFixer extends AbstractAdapter implements FixableToolAdapt
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         $this->assertDryRun();
@@ -50,7 +55,11 @@ final readonly class CSFixer extends AbstractAdapter implements FixableToolAdapt
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildFixProcess(Paths $paths): Process
     {
         if (!Cli::mentions($this->command, 'php-cs-fixer fix')) {
@@ -64,6 +73,7 @@ final readonly class CSFixer extends AbstractAdapter implements FixableToolAdapt
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'PHP CS Fixer';
@@ -79,6 +89,7 @@ final readonly class CSFixer extends AbstractAdapter implements FixableToolAdapt
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $findings = [];

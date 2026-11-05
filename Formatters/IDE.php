@@ -19,6 +19,7 @@ final readonly class IDE implements OutputFormatter
      *
      * @return string
      */
+    #[\Override]
     public function format(array $findings): string
     {
         $lines = [];

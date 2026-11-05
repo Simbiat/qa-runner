@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Helpers;
 
+use Random\RandomException;
+
 /**
  * Temporary copies of files. The fixers work on the copies, so the original files stay as they are until the end of the run.
  *
@@ -21,7 +23,7 @@ final class TempCopies
      * @param array<string, array{temp: string, hash: string}> $copies Original path => path of the copy and hash of the original content at the time of the copy
      */
     private function __construct(
-        private array $copies
+        private array $copies,
     ) {}
 
     /**
@@ -34,7 +36,10 @@ final class TempCopies
         $errors = [];
         foreach ($this->changed() as $original) {
             $current = \md5_file($original);
-            if ($current === false || $current !== $this->copies[$original]['hash']) {
+            if (
+                $current === false
+                || $current !== $this->copies[$original]['hash']
+            ) {
                 $errors[] = "'{$original}' changed during the run, so the fixes for it were not applied.";
 
                 continue;
@@ -42,7 +47,10 @@ final class TempCopies
 
             $content = \file_get_contents($this->copies[$original]['temp']);
             // Writing to the existing file keeps its owner, permissions and inode
-            if ($content === false || \file_put_contents($original, $content) === false) {
+            if (
+                $content === false
+                || \file_put_contents($original, $content) === false
+            ) {
                 $errors[] = "Failed to write the fixed content to '{$original}'.";
             }
         }
@@ -59,7 +67,10 @@ final class TempCopies
     {
         $changed = [];
         foreach ($this->copies as $original => $copy) {
-            if (\is_file($copy['temp']) && \md5_file($copy['temp']) !== $copy['hash']) {
+            if (
+                \is_file($copy['temp'])
+                && \md5_file($copy['temp']) !== $copy['hash']
+            ) {
                 $changed[] = $original;
             }
         }
@@ -80,6 +91,48 @@ final class TempCopies
     }
 
     /**
+     * Make copies of the files in the paths. Directories are not supported: a directory has no file list without a filter, and the filters belong to the tools.
+     *
+     * @param Paths $paths Paths from CLI
+     *
+     * @return self
+     *
+     * @throws \RuntimeException If a path is a directory, or a copy cannot be made. The copies, that were made before it, are removed.
+     * @throws \Throwable
+     */
+    public static function create(Paths $paths): self
+    {
+        foreach ($paths->absolute as $path) {
+            if (\is_dir($path)) {
+                throw new \RuntimeException("'$path' is a directory. The `diff` and `fix` commands accept only files.");
+            }
+        }
+
+        $instance = new self([]);
+
+        try {
+            foreach ($paths->absolute as $file) {
+                $content = \file_get_contents($file);
+                $temp = self::tempName($file);
+                if (
+                    $content === false
+                    || \file_put_contents($temp, $content) === false
+                ) {
+                    throw new \RuntimeException("Failed to make a temporary copy of '{$file}'. Check that the directory is writable.");
+                }
+
+                $instance->copies[$file] = ['temp' => $temp, 'hash' => \md5($content)];
+            }
+        } catch (\Throwable $throwable) {
+            $instance->cleanup();
+
+            throw $throwable instanceof \RuntimeException ? $throwable : new \RuntimeException($throwable->getMessage(), $throwable->getCode(), $throwable);
+        }
+
+        return $instance;
+    }
+
+    /**
      * Check if there are no copies.
      *
      * @return bool
@@ -92,25 +145,13 @@ final class TempCopies
     /**
      * Paths of the copies, for the tools.
      *
-     * @return \Simbiat\QARunner\Helpers\Paths
+     * @return Paths
      *
      * @throws \InvalidArgumentException
      */
     public function paths(): Paths
     {
         return Paths::fromCli(\array_column($this->copies, 'temp'), '/');
-    }
-
-    /**
-     * Path of the copy of a file.
-     *
-     * @param string $original Original path
-     *
-     * @return string
-     */
-    public function tempFor(string $original): string
-    {
-        return $this->copies[$original]['temp'];
     }
 
     /**
@@ -128,46 +169,21 @@ final class TempCopies
             $map[\basename($copy['temp'])] = \basename($original);
         }
 
-        return $map === [] ? $text : \strtr($text, $map);
+        return $map === []
+            ? $text
+            : \strtr($text, $map);
     }
 
     /**
-     * Make copies of the files in the paths. Directories are not supported: a directory has no file list without a filter, and the filters belong to the tools.
+     * Path of the copy of a file.
      *
-     * @param \Simbiat\QARunner\Helpers\Paths $paths Paths from CLI
+     * @param string $original Original path
      *
-     * @return self
-     *
-     * @throws \RuntimeException If a path is a directory, or a copy cannot be made. The copies, that were made before it, are removed.
-     * @throws \Throwable
+     * @return string
      */
-    public static function create(Paths $paths): self
+    public function tempFor(string $original): string
     {
-        foreach ($paths->absolute as $path) {
-            if (\is_dir($path)) {
-                throw new \RuntimeException("'{$path}' is a directory. The `diff` and `fix` commands accept only files.");
-            }
-        }
-
-        $instance = new self([]);
-
-        try {
-            foreach ($paths->absolute as $file) {
-                $content = \file_get_contents($file);
-                $temp = self::tempName($file);
-                if ($content === false || \file_put_contents($temp, $content) === false) {
-                    throw new \RuntimeException("Failed to make a temporary copy of '{$file}'. Check that the directory is writable.");
-                }
-
-                $instance->copies[$file] = ['temp' => $temp, 'hash' => \md5($content)];
-            }
-        } catch (\Throwable $throwable) {
-            $instance->cleanup();
-
-            throw $throwable instanceof \RuntimeException ? $throwable : new \RuntimeException($throwable->getMessage(), $throwable->getCode(), $throwable);
-        }
-
-        return $instance;
+        return $this->copies[$original]['temp'];
     }
 
     /**
@@ -177,7 +193,7 @@ final class TempCopies
      *
      * @return string
      *
-     * @throws \Random\RandomException
+     * @throws RandomException
      */
     private static function tempName(string $file): string
     {

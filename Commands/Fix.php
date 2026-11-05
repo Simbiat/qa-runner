@@ -10,6 +10,7 @@ use Simbiat\QARunner\Helpers\FailureMessage;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Helpers\TempCopies;
 use Simbiat\QARunner\Helpers\UnifiedDiff;
+use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 
 /**
  * Runner for `fix` and `diff` commands.
@@ -17,8 +18,8 @@ use Simbiat\QARunner\Helpers\UnifiedDiff;
 final readonly class Fix
 {
     /**
-     * @param array<string, \Simbiat\QARunner\Interfaces\FixableToolAdapter> $adapters List of adapters to use
-     * @param float|null                                                     $timeout  Timeout in seconds for each tool. Null means no timeout.
+     * @param array<string, FixableToolAdapter> $adapters List of adapters to use
+     * @param float|null                        $timeout  Timeout in seconds for each tool. Null means no timeout.
      */
     public function __construct(
         private array  $adapters,
@@ -34,9 +35,9 @@ final readonly class Fix
      * @param Paths $paths Paths to process
      * @param bool  $apply True to write the result over the original files. False to only create a diff for each file and leave the originals as they are.
      *
-     * @return \Simbiat\QARunner\Entities\FixRun
+     * @return FixRun
      *
-     * @throws \RuntimeException If a path is a directory, or a temporary copy cannot be made
+     * @throws \RuntimeException|\Throwable If a path is a directory, or a temporary copy cannot be made
      */
     public function run(Paths $paths, bool $apply): FixRun
     {
@@ -72,9 +73,11 @@ final readonly class Fix
     /**
      * Run all the tools on the copies.
      *
-     * @param \Simbiat\QARunner\Helpers\TempCopies $copies Temporary copies
+     * @param TempCopies $copies Temporary copies
      *
-     * @return list<\Simbiat\QARunner\Entities\FixResult>
+     * @return list<FixResult>
+     *
+     * @throws \InvalidArgumentException
      */
     private function runTools(TempCopies $copies): array
     {
@@ -90,7 +93,9 @@ final readonly class Fix
                 $result = $adapter->parseFix($process, $tool_paths);
                 $results[] = new FixResult($result->tool, $result->success, $copies->restoreNames($result->output));
             } catch (\Throwable $exception) {
-                $message = $process === null ? $exception->getMessage() : FailureMessage::forRun($process, $exception);
+                $message = $process === null
+                    ? $exception->getMessage()
+                    : FailureMessage::forRun($process, $exception);
                 $results[] = new FixResult($adapter->name(), success: false, output: $copies->restoreNames($message));
             }
         }

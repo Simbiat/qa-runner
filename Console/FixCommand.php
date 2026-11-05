@@ -30,11 +30,13 @@ final class FixCommand extends AbstractQACommand
 
     /**
      * {@inheritDoc}
+     *
+     * @throws \RuntimeException|\Throwable
      */
     #[\Override]
     protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int
     {
-        /** @var array<string, \Simbiat\QARunner\Interfaces\FixableToolAdapter> $adapters */
+        /** @var array<string, FixableToolAdapter> $adapters */
         $fixer = new Fix($adapters, $timeout);
         $run = $fixer->run($paths, apply: true);
 

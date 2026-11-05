@@ -14,15 +14,15 @@ final class Sorter
     /**
      * Sort findings by the number of findings of their rule (from highest to lowest), then like `sortByType`.
      *
-     * @param array<array-key, \Simbiat\QARunner\Entities\Finding> $findings List of findings
+     * @param array<array-key, Finding> $findings List of findings
      *
-     * @return array<array-key, \Simbiat\QARunner\Entities\Finding>
+     * @return array<array-key, Finding>
      */
     public static function sortByCount(array $findings): array
     {
         $counts = RuleCounter::count($findings);
         $sorted = \array_values($findings);
-        \usort($sorted, static fn(Finding $a, Finding $b): int => ($counts[RuleCounter::key($b)] <=> $counts[RuleCounter::key($a)]) ?: self::compareByType($a, $b));
+        \usort($sorted, static fn(Finding $a, Finding $b): int => $counts[RuleCounter::key($b)] <=> $counts[RuleCounter::key($a)] ?: self::compareByType($a, $b));
 
         return $sorted;
     }

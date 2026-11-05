@@ -8,6 +8,7 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -26,7 +27,11 @@ final readonly class Rector extends AbstractAdapter implements FixableToolAdapte
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         $this->assertRector();
@@ -43,7 +48,11 @@ final readonly class Rector extends AbstractAdapter implements FixableToolAdapte
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildFixProcess(Paths $paths): Process
     {
         $this->assertRector();
@@ -57,6 +66,7 @@ final readonly class Rector extends AbstractAdapter implements FixableToolAdapte
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'Rector';
@@ -72,6 +82,7 @@ final readonly class Rector extends AbstractAdapter implements FixableToolAdapte
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $findings = [];

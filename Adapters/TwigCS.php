@@ -9,6 +9,7 @@ use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 use TwigCsFixer\Rules\AbstractFixableRule;
 
@@ -18,14 +19,14 @@ use TwigCsFixer\Rules\AbstractFixableRule;
 final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapter
 {
     /**
-     * Purpose of the tool.
-     */
-    protected const array TYPES = ['twig'];
-
-    /**
      * 0 - no violations, 1 - violations found. Anything else is a failure of the tool.
      */
     protected const array OK_EXIT_CODES = [0, 1];
+
+    /**
+     * Purpose of the tool.
+     */
+    protected const array TYPES = ['twig'];
 
     /**
      * Method to prepare Check command. Adapter appends whatever flags *it* needs for parsing to work, then the paths.
@@ -33,7 +34,11 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         if (
@@ -53,7 +58,11 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      * @param Paths $paths Paths to be processed. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildFixProcess(Paths $paths): Process
     {
         if (
@@ -69,6 +78,7 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'Twig CS Fixer';
@@ -84,6 +94,7 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
      *
      * @throws \RuntimeException If the output is not valid XML
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         if (\trim($output) === '') {

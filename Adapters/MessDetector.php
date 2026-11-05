@@ -8,6 +8,7 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -26,7 +27,11 @@ final readonly class MessDetector extends AbstractAdapter
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         if (!Cli::mentions($this->command, 'phpmd analyze')) {
@@ -43,6 +48,7 @@ final readonly class MessDetector extends AbstractAdapter
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'PHP Mess Detector';
@@ -58,6 +64,7 @@ final readonly class MessDetector extends AbstractAdapter
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $data = $this->decodeJson($output);

@@ -34,7 +34,10 @@ final class UnifiedDiff
     {
         $old = \file_get_contents($original);
         $new = \file_get_contents($modified);
-        if ($old === false || $new === false) {
+        if (
+            $old === false
+            || $new === false
+        ) {
             throw new \RuntimeException('Failed to read the files for the diff.');
         }
 
@@ -45,129 +48,6 @@ final class UnifiedDiff
         $operations = self::operations(self::lines($old), self::lines($new));
 
         return \rtrim("--- {$label} (original)\n+++ {$label} (fixed)\n".self::hunks($operations));
-    }
-
-    /**
-     * Split text to lines. Each line keeps its line break, so a missing line break at the end of the file is a difference too.
-     *
-     * @param string $text Text
-     *
-     * @return list<string>
-     */
-    private static function lines(string $text): array
-    {
-        return $text === '' ? [] : (\preg_split('/(?<=\n)/', $text, -1, \PREG_SPLIT_NO_EMPTY) ?: []);
-    }
-
-    /**
-     * Compare 2 lists of lines.
-     *
-     * @param list<string> $old Old lines
-     * @param list<string> $new New lines
-     *
-     * @return list<array{0: string, 1: string}> Operations in order: ` ` (same), `-` (removed) or `+` (added), and the line
-     */
-    private static function operations(array $old, array $new): array
-    {
-        $old_count = \count($old);
-        $new_count = \count($new);
-        $start = 0;
-        while ($start < $old_count && $start < $new_count && $old[$start] === $new[$start]) {
-            ++$start;
-        }
-
-        $end = 0;
-        while ($end < $old_count - $start && $end < $new_count - $start && $old[$old_count - 1 - $end] === $new[$new_count - 1 - $end]) {
-            ++$end;
-        }
-
-        $middle = self::myers(\array_slice($old, $start, $old_count - $start - $end), \array_slice($new, $start, $new_count - $start - $end));
-
-        $operations = [];
-        for ($i = 0; $i < $start; ++$i) {
-            $operations[] = [' ', $old[$i]];
-        }
-
-        foreach ($middle as $operation) {
-            $operations[] = $operation;
-        }
-
-        for ($i = $old_count - $end; $i < $old_count; ++$i) {
-            $operations[] = [' ', $old[$i]];
-        }
-
-        return $operations;
-    }
-
-    /**
-     * Myers diff algorithm.
-     *
-     * @param list<string> $old Old lines
-     * @param list<string> $new New lines
-     *
-     * @return list<array{0: string, 1: string}>
-     */
-    private static function myers(array $old, array $new): array
-    {
-        $old_count = \count($old);
-        $new_count = \count($new);
-        $replace = static function () use ($old, $new): array {
-            return [...\array_map(static fn(string $line): array => ['-', $line], $old), ...\array_map(static fn(string $line): array => ['+', $line], $new)];
-        };
-        if ($old_count === 0 || $new_count === 0) {
-            return $replace();
-        }
-
-        $max = \min($old_count + $new_count, self::MAX_EDIT_DISTANCE);
-        $v = [1 => 0];
-        $trace = [];
-        $found = false;
-        for ($d = 0; $d <= $max && !$found; ++$d) {
-            $trace[$d] = $v;
-            for ($k = -$d; $k <= $d; $k += 2) {
-                $x = ($k === -$d || ($k !== $d && $v[$k - 1] < $v[$k + 1])) ? $v[$k + 1] : $v[$k - 1] + 1;
-                $y = $x - $k;
-                while ($x < $old_count && $y < $new_count && $old[$x] === $new[$y]) {
-                    ++$x;
-                    ++$y;
-                }
-
-                $v[$k] = $x;
-                if ($x >= $old_count && $y >= $new_count) {
-                    $found = true;
-
-                    break;
-                }
-            }
-        }
-
-        if (!$found) {
-            return $replace();
-        }
-
-        $operations = [];
-        $x = $old_count;
-        $y = $new_count;
-        for ($d = \count($trace) - 1; $d >= 0; --$d) {
-            $previous = $trace[$d];
-            $k = $x - $y;
-            $previous_k = ($k === -$d || ($k !== $d && $previous[$k - 1] < $previous[$k + 1])) ? $k + 1 : $k - 1;
-            $previous_x = $d === 0 ? 0 : $previous[$previous_k];
-            $previous_y = $d === 0 ? 0 : $previous_x - $previous_k;
-            while ($x > $previous_x && $y > $previous_y) {
-                $operations[] = [' ', $old[$x - 1]];
-                --$x;
-                --$y;
-            }
-
-            if ($d > 0) {
-                $operations[] = $x === $previous_x ? ['+', $new[$y - 1]] : ['-', $old[$x - 1]];
-                $x = $previous_x;
-                $y = $previous_y;
-            }
-        }
-
-        return \array_reverse($operations);
     }
 
     /**
@@ -201,11 +81,14 @@ final class UnifiedDiff
         }
 
         $ranges = [];
-        foreach ($changes as $index) {
-            $from = \max(0, $index - self::CONTEXT);
-            $to = \min(\count($operations) - 1, $index + self::CONTEXT);
+        foreach ($changes as $change) {
+            $from = \max(0, $change - self::CONTEXT);
+            $to = \min(\count($operations) - 1, $change + self::CONTEXT);
             $last = \count($ranges) - 1;
-            if ($last >= 0 && $from <= $ranges[$last][1] + 1) {
+            if (
+                $last >= 0
+                && $from <= $ranges[$last][1] + 1
+            ) {
                 $ranges[$last][1] = $to;
             } else {
                 $ranges[] = [$from, $to];
@@ -219,8 +102,12 @@ final class UnifiedDiff
             $body = '';
             for ($i = $from; $i <= $to; ++$i) {
                 [$type, $line] = $operations[$i];
-                $old_count += $type === '+' ? 0 : 1;
-                $new_count += $type === '-' ? 0 : 1;
+                $old_count += $type === '+'
+                    ? 0
+                    : 1;
+                $new_count += $type === '-'
+                    ? 0
+                    : 1;
                 $body .= $type.$line.(\str_ends_with($line, "\n") ? '' : "\n\\ No newline at end of file\n");
             }
 
@@ -230,5 +117,161 @@ final class UnifiedDiff
         }
 
         return $text;
+    }
+
+    /**
+     * Split text to lines. Each line keeps its line break, so a missing line break at the end of the file is a difference too.
+     *
+     * @param string $text Text
+     *
+     * @return list<string>
+     */
+    private static function lines(string $text): array
+    {
+        return $text === ''
+            ? []
+            : (\preg_split('/(?<=\n)/', $text, -1, \PREG_SPLIT_NO_EMPTY) ?: []);
+    }
+
+    /**
+     * Myers diff algorithm.
+     *
+     * @param list<string> $old Old lines
+     * @param list<string> $new New lines
+     *
+     * @return list<array{0: string, 1: string}>
+     */
+    private static function myers(array $old, array $new): array
+    {
+        $old_count = \count($old);
+        $new_count = \count($new);
+        $replace = static fn(): array => [...\array_map(static fn(string $line): array => ['-', $line], $old), ...\array_map(static fn(string $line): array => ['+', $line], $new)];
+        if (
+            $old_count === 0
+            || $new_count === 0
+        ) {
+            return $replace();
+        }
+
+        $max = \min($old_count + $new_count, self::MAX_EDIT_DISTANCE);
+        $v = [1 => 0];
+        $trace = [];
+        $found = false;
+        for ($d = 0; $d <= $max && !$found; ++$d) {
+            $trace[$d] = $v;
+            for ($k = -$d; $k <= $d; $k += 2) {
+                $x = $k === -$d || ($k !== $d && $v[$k - 1] < $v[$k + 1])
+                    ? $v[$k + 1]
+                    : $v[$k - 1] + 1;
+                $y = $x - $k;
+                while (
+                    $x < $old_count
+                    && $y < $new_count
+                    && $old[$x] === $new[$y]
+                ) {
+                    ++$x;
+                    ++$y;
+                }
+
+                $v[$k] = $x;
+                if (
+                    $x >= $old_count
+                    && $y >= $new_count
+                ) {
+                    $found = true;
+
+                    break;
+                }
+            }
+        }
+
+        if (!$found) {
+            return $replace();
+        }
+
+        $operations = [];
+        $x = $old_count;
+        $y = $new_count;
+        for ($d = \count($trace) - 1; $d >= 0; --$d) {
+            $previous = $trace[$d];
+            $k = $x - $y;
+            $previous_k = $k === -$d || ($k !== $d && $previous[$k - 1] < $previous[$k + 1])
+                ? $k + 1
+                : $k - 1;
+            $previous_x = $d === 0
+                ? 0
+                : $previous[$previous_k];
+            $previous_y = $d === 0
+                ? 0
+                : $previous_x - $previous_k;
+            while (
+                $x > $previous_x
+                && $y > $previous_y
+            ) {
+                $operations[] = [' ', $old[$x - 1]];
+                --$x;
+                --$y;
+            }
+
+            if ($d <= 0) {
+                continue;
+            }
+
+            $operations[] = $x === $previous_x
+                ? ['+', $new[$y - 1]]
+                : ['-', $old[$x - 1]];
+            $x = $previous_x;
+            $y = $previous_y;
+        }
+
+        return \array_reverse($operations);
+    }
+
+    /**
+     * Compare 2 lists of lines.
+     *
+     * @param list<string> $old Old lines
+     * @param list<string> $new New lines
+     *
+     * @return list<array{0: string, 1: string}> Operations in order: ` ` (same), `-` (removed) or `+` (added), and the line
+     */
+    private static function operations(array $old, array $new): array
+    {
+        $old_count = \count($old);
+        $new_count = \count($new);
+        $start = 0;
+        while (
+            $start < $old_count
+            && $start < $new_count
+            && $old[$start] === $new[$start]
+        ) {
+            ++$start;
+        }
+
+        $end = 0;
+        while (
+            $end < $old_count - $start
+            && $end < $new_count - $start
+            && $old[$old_count - 1 - $end] === $new[$new_count - 1 - $end]
+        ) {
+            ++$end;
+        }
+
+        $middle = self::myers(\array_slice($old, $start, $old_count - $start - $end), \array_slice($new, $start, $new_count - $start - $end));
+
+        $operations = [];
+        for ($i = 0; $i < $start; ++$i) {
+            $operations[] = [' ', $old[$i]];
+        }
+
+        foreach ($middle as $operation) {
+            $operations[] = $operation;
+        }
+
+        for ($i = $old_count - $end; $i < $old_count; ++$i) {
+            $operations[] = [' ', $old[$i]];
+        }
+
+        return $operations;
     }
 }

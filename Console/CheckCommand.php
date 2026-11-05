@@ -16,6 +16,7 @@ use Simbiat\QARunner\Helpers\Sorter;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
 use Simbiat\QARunner\Interfaces\ToolAdapter;
 use Symfony\Component\Console\Attribute\AsCommand;
+use Symfony\Component\Console\Exception\InvalidArgumentException;
 use Symfony\Component\Console\Exception\InvalidOptionException;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
@@ -34,11 +35,14 @@ final class CheckCommand extends AbstractQACommand
 
     /**
      * {@inheritDoc}
+     *
+     * @throws InvalidArgumentException
      */
     #[\Override]
     protected function configure(): void
     {
         parent::configure();
+
         $this
             ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: '.\implode(' or ', self::FORMATS), 'ide', self::FORMATS)
             ->addOption('by-type', mode: InputOption::VALUE_NONE, description: 'Group findings by tool, type and rule instead of by file')
@@ -59,19 +63,21 @@ final class CheckCommand extends AbstractQACommand
 
     /**
      * {@inheritDoc}
+     *
+     * @throws InvalidArgumentException
      */
     #[\Override]
     protected function runTools(array $adapters, Paths $paths, ?float $timeout, InputInterface $input, OutputInterface $output): int
     {
-        $by_type = (bool) $input->getOption('by-type');
-        $format = (string) $input->getOption('format');
-        $by_count = (bool) $input->getOption('by-count');
-        if ($by_count) {
-            $count = true;
-        } else {
-            $count = (bool) $input->getOption('count');
-        }
-        if ($count && !\in_array($format, ['csv', 'tsv'], strict: true)) {
+        $by_type = $input->getOption('by-type');
+        $format = $input->getOption('format');
+        $by_count = $input->getOption('by-count');
+        $count = $by_count || $input->getOption('count');
+
+        if (
+            $count
+            && !\in_array($format, ['csv', 'tsv'], strict: true)
+        ) {
             $this->warn($output, '`--count` works only with `csv` and `tsv` formats, so it is ignored.');
             $count = false;
         }
@@ -81,7 +87,9 @@ final class CheckCommand extends AbstractQACommand
         $result = new Check($adapters, $timeout)->run($paths);
 
         // Failures are shown among the findings, since the IDE shows only the output, that has file and line in it
-        $items = (bool) $input->getOption('fixable') ? \array_values(\array_filter($result->items, static fn(Finding $finding): bool => $finding->fixable)) : $result->items;
+        $items = $input->getOption('fixable')
+            ? \array_values(\array_filter($result->items, static fn(Finding $finding): bool => $finding->fixable))
+            : $result->items;
         $findings = $items;
         foreach ($result->failures as $tool => $message) {
             $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: Severity::ERROR);

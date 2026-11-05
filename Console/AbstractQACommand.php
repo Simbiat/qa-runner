@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Simbiat\QARunner\Console;
 
+use JetBrains\PhpStorm\Pure;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\ColorDiff;
 use Simbiat\QARunner\Helpers\Config;
@@ -38,7 +39,20 @@ abstract class AbstractQACommand extends Command
     private const string DEFAULT_TIMEOUT = '600';
 
     /**
+     * Name of the node in `extra.qa-runner` in composer.json, that has the commands for this command. By default, it is the name of the command.
+     *
+     * @return string
+     */
+    #[Pure]
+    protected function configMode(): string
+    {
+        return (string) $this->getName();
+    }
+
+    /**
      * {@inheritDoc}
+     *
+     * @throws InvalidArgumentException
      */
     #[\Override]
     protected function configure(): void
@@ -78,6 +92,8 @@ abstract class AbstractQACommand extends Command
     /**
      * {@inheritDoc}
      *
+     * @throws InvalidArgumentException|RuntimeException
+     * @throws InvalidOptionException
      * @throws \ReflectionException
      */
     #[\Override]
@@ -106,38 +122,6 @@ abstract class AbstractQACommand extends Command
         }
 
         return $this->runTools($adapters, $paths, $timeout, $input, $output);
-    }
-
-    /**
-     * Write the combined diffs of the files. With colors, the diffs are colored. Without colors, they stay in the plain unified format, which `patch` can read.
-     *
-     * @param \Symfony\Component\Console\Output\OutputInterface $output Output
-     * @param array<string, string>                                $diffs  Path => diff
-     */
-    protected function writeDiffs(OutputInterface $output, array $diffs): void
-    {
-        if ($diffs === []) {
-            return;
-        }
-
-        if ($output->isDecorated()) {
-            $output->writeln(\implode("\n\n", \array_map(ColorDiff::format(...), \array_keys($diffs), $diffs)));
-
-            return;
-        }
-
-        // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
-        $output->writeln(\implode("\n\n", $diffs), OutputInterface::OUTPUT_RAW);
-    }
-
-    /**
-     * Name of the node in `extra.qa-runner` in composer.json, that has the commands for this command. By default, it is the name of the command.
-     *
-     * @return string
-     */
-    protected function configMode(): string
-    {
-        return (string) $this->getName();
     }
 
     /**
@@ -172,6 +156,28 @@ abstract class AbstractQACommand extends Command
     }
 
     /**
+     * Write the combined diffs of the files. With colors, the diffs are colored. Without colors, they stay in the plain unified format, which `patch` can read.
+     *
+     * @param OutputInterface       $output Output
+     * @param array<string, string> $diffs  Path => diff
+     */
+    protected function writeDiffs(OutputInterface $output, array $diffs): void
+    {
+        if ($diffs === []) {
+            return;
+        }
+
+        if ($output->isDecorated()) {
+            $output->writeln(\implode("\n\n", \array_map(ColorDiff::format(...), \array_keys($diffs), $diffs)));
+
+            return;
+        }
+
+        // Raw output: diffs can contain `<` and `>`, which must not be read as formatting tags
+        $output->writeln(\implode("\n\n", $diffs), OutputInterface::OUTPUT_RAW);
+    }
+
+    /**
      * Create the adapters, that are configured for the command and support it. Adapters, whose program does not exist or is not executable, are skipped with a warning.
      *
      * @param Config          $config  Config from composer.json
@@ -181,6 +187,7 @@ abstract class AbstractQACommand extends Command
      *
      * @return array<string, ToolAdapter>
      *
+     * @throws InvalidArgumentException
      * @throws \ReflectionException
      */
     private function createAdapters(Config $config, string $project, InputInterface $input, OutputInterface $output): array
@@ -192,28 +199,35 @@ abstract class AbstractQACommand extends Command
 
         $adapters = [];
         foreach ($config->commandsFor($this->configMode()) as $class => $command) {
-            if (!\is_a($class, ToolAdapter::class, allow_string: true) || !new \ReflectionClass($class)->isInstantiable()) {
-                $this->warn($output, "'{$class}' is not a known ToolAdapter, skipping.");
+            if (
+                !\is_a($class, ToolAdapter::class, allow_string: true)
+                || !new \ReflectionClass($class)->isInstantiable()
+            ) {
+                $this->warn($output, "'$class' is not a known ToolAdapter, skipping.");
 
                 continue;
             }
 
             if (!\is_a($class, $required, allow_string: true)) {
-                $this->warn($output, "'{$class}' does not support '".$this->getName()."', skipping.");
+                $this->warn($output, "'$class' does not support '".$this->getName()."', skipping.");
 
                 continue;
             }
 
-            /* @var class-string<ToolAdapter> $class -- False positive from EA Inspections, despite the proper hinting in the method */
             $adapter = new $class($project, $command, $full_scan, $bin_dir);
             // Not an error: the tool is just not requested
-            if ($types !== [] && \array_intersect($types, \array_map(\mb_strtolower(...), $adapter->types())) === []) {
+            if (
+                $types !== [] && \array_intersect($types, \array_map(
+                    static fn(string $type): string => \mb_strtolower($type, 'UTF-8'),
+                    $adapter->types(),
+                )) === []
+            ) {
                 continue;
             }
 
             $reason = Cli::unrunnableReason($command, $project, $bin_dir);
             if ($reason !== null) {
-                $this->warn($output, "'{$class}' skipped, because {$reason}. Command: `{$command}`");
+                $this->warn($output, "'$class' skipped, because $reason. Command: `$command`");
 
                 continue;
             }
@@ -230,6 +244,8 @@ abstract class AbstractQACommand extends Command
      * @param InputInterface $input Input
      *
      * @return string
+     *
+     * @throws InvalidOptionException
      */
     private static function projectDirectory(InputInterface $input): string
     {
@@ -248,28 +264,13 @@ abstract class AbstractQACommand extends Command
     }
 
     /**
-     * Types from `--tool-type`.
-     *
-     * @param \Symfony\Component\Console\Input\InputInterface $input Input
-     *
-     * @return list<string> Types in lower case. An empty list means all the tools.
-     */
-    private static function toolTypes(InputInterface $input): array
-    {
-        $raw = $input->getOption('tool-type');
-
-        return \array_values(\array_unique(\array_filter(
-            \array_map(static fn(mixed $type): string => \is_string($type) ? \mb_strtolower(\trim($type), 'UTF-8') : '', \is_array($raw) ? $raw : []),
-            static fn(string $type): bool => $type !== '',
-        )));
-    }
-
-    /**
      * Timeout from `--timeout`.
      *
      * @param InputInterface $input Input
      *
      * @return float|null Seconds, or null for no timeout
+     *
+     * @throws InvalidArgumentException|InvalidOptionException
      */
     private static function timeout(InputInterface $input): ?float
     {
@@ -284,5 +285,24 @@ abstract class AbstractQACommand extends Command
         return (float) $raw > 0
             ? (float) $raw
             : null;
+    }
+
+    /**
+     * Types from `--tool-type`.
+     *
+     * @param InputInterface $input Input
+     *
+     * @return list<string> Types in lower case. An empty list means all the tools.
+     *
+     * @throws InvalidArgumentException
+     */
+    private static function toolTypes(InputInterface $input): array
+    {
+        $raw = $input->getOption('tool-type');
+
+        return \array_values(\array_unique(\array_filter(
+            \array_map(static fn(mixed $type): string => \is_string($type) ? \mb_strtolower(\trim($type), 'UTF-8') : '', \is_array($raw) ? $raw : []),
+            static fn(string $type): bool => $type !== '',
+        )));
     }
 }

@@ -8,6 +8,7 @@ use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
+use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
 
 /**
@@ -26,7 +27,11 @@ final readonly class Stan extends AbstractAdapter
      * @param Paths $paths Paths to be scanned. Taken from CLI.
      *
      * @return Process
+     *
+     * @throws LogicException
+     * @throws \UnexpectedValueException
      */
+    #[\Override]
     public function buildCheckProcess(Paths $paths): Process
     {
         if (\preg_match('/phpstan\s+analy[sz]e/i', $this->command) !== 1) {
@@ -43,6 +48,7 @@ final readonly class Stan extends AbstractAdapter
     /**
      * Display label used as Finding::tool.
      */
+    #[\Override]
     public function name(): string
     {
         return 'PHPStan';
@@ -58,6 +64,7 @@ final readonly class Stan extends AbstractAdapter
      *
      * @throws \JsonException
      */
+    #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
         $data = $this->decodeJson($output);
