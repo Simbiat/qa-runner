@@ -70,6 +70,11 @@ final readonly class Stan extends AbstractAdapter
         $data = $this->decodeJson($output);
         $findings = [];
         foreach ($data['files'] ?? [] as $file => $file_data) {
+            $context = \preg_replace('/^(.+)( \(in context of .+\))$/uir', '$2', $file);
+            $file = \preg_replace('/^(.+)( \(in context of .+\))$/uir', '$1', $file);
+            if ($context === $file) {
+                $context = '';
+            }
             if (!$paths->covers((string) $file)) {
                 continue;
             }
@@ -80,7 +85,7 @@ final readonly class Stan extends AbstractAdapter
                     rule: $message['identifier'] ?? 'unknown',
                     file: (string) $file,
                     line: (int) ($message['line'] ?? 0),
-                    message: $message['message'] ?? '',
+                    message: ($message['message'] ?? '').$context,
                 );
             }
         }
