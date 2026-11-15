@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Exception\LogicException;
@@ -97,7 +96,7 @@ final readonly class Stan extends AbstractAdapter
                 rule: 'general',
                 file: $this->project_root,
                 message: (string) $error,
-                type: Severity::ERROR,
+                type: 'ERROR',
             );
         }
 

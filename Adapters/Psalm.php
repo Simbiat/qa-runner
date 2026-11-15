@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
+use Simbiat\QARunner\Helpers\PsalmTaint;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
 use Symfony\Component\Process\Exception\LogicException;
 use Symfony\Component\Process\Process;
@@ -71,8 +71,8 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
             throw new \UnexpectedValueException('Not a Psalm command');
         }
 
-        // Enforce JSON format. Remove --taint-analysis flag, since it results in different kind of output, and --alter since it would modify the file
-        $command = Cli::setOption(Cli::strip($this->command, ['--taint-analysis', '--alter']), '--output-format', 'json');
+        // Enforce JSON format. Remove --alter, since it would modify the files. --taint-analysis stays: taint issues are in the same JSON and are split by PsalmTaint
+        $command = Cli::setOption(Cli::strip($this->command, ['--alter']), '--output-format', 'json');
 
         return $this->shell($command, $this->full_scan ? null : $paths);
     }
@@ -123,22 +123,40 @@ final readonly class Psalm extends AbstractAdapter implements FixableToolAdapter
     #[\Override]
     protected function extractFindings(string $output, Paths $paths): array
     {
+        // Taint issues are split to separate issues (see PsalmTaint). Paths are checked for each of them, and identical ones are removed
+        $issues = [];
+        $seen = [];
+        foreach ($this->decodeJson($output) as $issue) {
+            foreach (PsalmTaint::unpack($issue) as $item) {
+                if (!$paths->covers((string) ($item['file_path'] ?? ''))) {
+                    continue;
+                }
+
+                $key = \md5(\serialize($item));
+                if (isset($seen[$key])) {
+                    continue;
+                }
+
+                $seen[$key] = true;
+                $issues[] = $item;
+            }
+        }
+
         $findings = [];
-        foreach ($this->decodeJson($output) as $finding) {
-            $file = (string) ($finding['file_path'] ?? '');
-            if (!$paths->covers($file)) {
-                continue;
+        foreach ($issues as $issue) {
+            if (\array_key_exists('is_security', $issue) && $issue['is_security']) {
+                $issue['severity'] = 'SECURITY';
             }
 
             $findings[] = new Finding(
                 tool: $this->name(),
-                rule: $finding['type'] ?? 'unknown',
-                file: $file,
-                line: (int) ($finding['line_from'] ?? 0),
-                column: (int) ($finding['column_from'] ?? 0),
-                message: $finding['message'] ?? '',
-                type: Severity::fromString($finding['severity'] ?? ''),
-                fixable: \in_array($finding['type'] ?? 'unknown', self::FIXABLE_ERRORS, strict: true),
+                rule: $issue['type'] ?? 'unknown',
+                file: (string) ($issue['file_path'] ?? ''),
+                line: (int) ($issue['line_from'] ?? 0),
+                column: (int) ($issue['column_from'] ?? 0),
+                message: $issue['message'] ?? '',
+                type: (string) ($issue['severity'] ?? ''),
+                fixable: \in_array($issue['type'] ?? 'unknown', self::FIXABLE_ERRORS, strict: true),
             );
         }
 

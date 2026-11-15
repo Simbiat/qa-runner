@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Symfony\Component\Process\Exception\LogicException;
@@ -92,13 +91,13 @@ final readonly class MessDetector extends AbstractAdapter
                     line: (int) $matches['line'],
                     column: (int) $matches['col'],
                     message: $matches['message'] ?? '',
-                    type: Severity::ERROR,
+                    type: 'ERROR',
                 ) : new Finding(
                     tool: $this->name(),
                     rule: 'processing-error',
                     file: '',
                     message: $error['message'] ?? '',
-                    type: Severity::ERROR,
+                    type: 'ERROR',
                 );
             } else {
                 $findings[] = new Finding(
@@ -106,7 +105,7 @@ final readonly class MessDetector extends AbstractAdapter
                     rule: 'processing-error',
                     file: $error['fileName'] ?? '',
                     message: $error['message'] ?? '',
-                    type: Severity::ERROR,
+                    type: 'ERROR',
                 );
             }
         }

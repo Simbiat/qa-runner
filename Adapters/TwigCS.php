@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
@@ -129,7 +128,7 @@ final readonly class TwigCS extends AbstractAdapter implements FixableToolAdapte
                     line: (int) $error_node->getAttribute('line'),
                     column: (int) $error_node->getAttribute('column'),
                     message: $error_node->getAttribute('message'),
-                    type: Severity::fromString($error_node->getAttribute('severity')),
+                    type: $error_node->getAttribute('severity'),
                     fixable: $fixable,
                 );
             }

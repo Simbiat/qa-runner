@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Adapters;
 
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Helpers\Cli;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Interfaces\FixableToolAdapter;
@@ -103,7 +102,7 @@ final readonly class CodeSniffer extends AbstractAdapter implements FixableToolA
                     line: (int) ($message['line'] ?? 0),
                     column: (int) ($message['column'] ?? 0),
                     message: $message['message'] ?? '',
-                    type: Severity::fromString($message['type'] ?? ''),
+                    type: (string) ($message['type'] ?? ''),
                     fixable: (bool) ($message['fixable'] ?? false),
                 );
             }

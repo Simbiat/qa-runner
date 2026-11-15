@@ -87,7 +87,7 @@ final class Sorter
         return \strnatcasecmp($a->tool, $b->tool)
             // Fixable is boolean, so need to "reverse" the order
             ?: $b->fixable <=> $a->fixable
-                ?: \strnatcasecmp($a->type->value, $b->type->value)
+                ?: \strnatcasecmp($a->type, $b->type)
                     ?: \strnatcasecmp($a->rule, $b->rule)
                         ?: \strnatcasecmp($a->file, $b->file)
                             ?: $a->line <=> $b->line

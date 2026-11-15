@@ -6,7 +6,6 @@ namespace Simbiat\QARunner\Console;
 
 use Simbiat\QARunner\Commands\Check;
 use Simbiat\QARunner\Entities\Finding;
-use Simbiat\QARunner\Entities\Severity;
 use Simbiat\QARunner\Formatters\Console;
 use Simbiat\QARunner\Formatters\CSV;
 use Simbiat\QARunner\Formatters\IDE;
@@ -92,7 +91,7 @@ final class CheckCommand extends AbstractQACommand
             : $result->items;
         $findings = $items;
         foreach ($result->failures as $tool => $message) {
-            $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: Severity::ERROR);
+            $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: 'ERROR');
         }
 
         $findings = match (true) {

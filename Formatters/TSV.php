@@ -42,7 +42,7 @@ final readonly class TSV implements OutputFormatter
                 (string) $finding->column,
                 self::escapeField($finding->tool),
                 $finding->fixable ? '"Y"' : '"N"',
-                self::escapeField($finding->type->value),
+                self::escapeField($finding->type),
                 self::escapeField($finding->message),
                 self::escapeField($finding->rule),
             ];

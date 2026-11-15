@@ -15,15 +15,6 @@ use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 final readonly class Console implements OutputFormatter
 {
     /**
-     * Colors by finding type (names of Symfony Console colors).
-     */
-    private const array COLORS = [
-        'ERROR' => 'red',
-        'NOTICE' => 'cyan',
-        'WARNING' => 'yellow',
-    ];
-
-    /**
      * @param bool $colors  Whether to color the output (pass `$output->isDecorated()`, so `--ansi`, `--no-ansi`, `NO_COLOR` and TTY detection work)
      * @param bool $by_rule Whether grouping by tool, type and rule should be used (the findings must be sorted accordingly) instead of grouping by file
      */
@@ -63,7 +54,7 @@ final readonly class Console implements OutputFormatter
             }
 
             if ($this->by_rule) {
-                $bucket = ($finding->fixable ? 'Fixable ' : '').$finding->type->value;
+                $bucket = ($finding->fixable ? 'Fixable ' : '').$finding->type;
                 if ($bucket !== $notch_bucket) {
                     $notch_bucket = $bucket;
                     $notch_rule = null;
@@ -81,7 +72,7 @@ final readonly class Console implements OutputFormatter
                     "\t%d:%d: %s %s (%s)",
                     $finding->line,
                     $finding->column,
-                    $this->color(\sprintf('[%s, %s%s]', $finding->tool, $finding->fixable ? 'Fixable ' : '', $finding->type->value), $finding->type),
+                    $this->color(\sprintf('[%s, %s%s]', $finding->tool, $finding->fixable ? 'Fixable ' : '', $finding->type), $finding->type),
                     $finding->message,
                     $finding->rule,
                 );
@@ -94,15 +85,15 @@ final readonly class Console implements OutputFormatter
     /**
      * Color the text, if colors are enabled.
      *
-     * @param string   $text Text to color
-     * @param Severity $type Type of finding, that decides the color
+     * @param string $text Text to color
+     * @param string $type Type of finding as returned by the tool. It is standardized to `Severity` to pick the color.
      *
      * @return string
      */
-    private function color(string $text, Severity $type): string
+    private function color(string $text, string $type): string
     {
         return $this->colors
-            ? new OutputFormatterStyle(self::COLORS[$type->value])->apply($text)
+            ? new OutputFormatterStyle(Severity::fromString($type)->color())->apply($text)
             : $text;
     }
 }
