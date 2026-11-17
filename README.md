@@ -101,6 +101,7 @@ Entries like `Simbiat\\QARunner\\Adapters\\CodeSniffer` - are respective classes
 5. [PHP MessDetector](https://github.com/phpmd/phpmd)
 6. [Rector](https://github.com/rectorphp/rector)
 7. [Twig CS Fixer](https://github.com/VincentLanglet/Twig-CS-Fixer)
+8. [Mago](https://github.com/carthage-software/mago) (Analyze, Guard, Lint, Twig:Lint as separate adapters)
 
 The values use references to Composer's `scripts`, so that you do not need to duplicate the code, if you are also running the respective tool separately. This means that `@phpcs` will be expanded to `phpcs --standard=/app/config/quality/phpcs.xml -s` at runtime. Or you can use the command there directly. When QA Runner prepares the commands it will do some sanitization for each respective tool (depends on the adapter's logic), and can add or remove flags depending on the mode.
 

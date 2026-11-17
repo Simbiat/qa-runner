@@ -174,7 +174,7 @@ abstract readonly class AbstractAdapter implements ToolAdapter
             return [];
         }
 
-        $data = \json_decode($output, associative: true, depth: 512, flags: \JSON_THROW_ON_ERROR);
+        $data = \json_decode($output, associative: true, flags: \JSON_THROW_ON_ERROR);
 
         return \is_array($data)
             ? $data

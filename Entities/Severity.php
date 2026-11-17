@@ -40,7 +40,7 @@ enum Severity: string
         return match (\strtoupper(\trim($raw))) {
             'ERROR', 'FATAL', 'CRITICAL', 'SECURITY' => self::ERROR,
             'WARNING', 'WARN' => self::WARNING,
-            'NOTICE', 'INFO', 'INFORMATION' => self::NOTICE,
+            'NOTICE', 'INFO', 'INFORMATION', 'HELP', 'NOTE' => self::NOTICE,
             default => $default,
         };
     }
