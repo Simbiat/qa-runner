@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Simbiat\QARunner\Formatters;
 
 use Simbiat\QARunner\Entities\Finding;
+use Simbiat\QARunner\Helpers\Hyperlink;
 use Simbiat\QARunner\Helpers\RuleCounter;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
 
@@ -14,10 +15,12 @@ use Simbiat\QARunner\Interfaces\OutputFormatter;
 final readonly class CSV implements OutputFormatter
 {
     /**
-     * @param bool $count Add the `Count` column: how many times the rule of the finding was found in total
+     * @param bool        $count         Add the `Count` column: how many times the rule of the finding was found in total
+     * @param string|null $link_template URL template for OSC 8 hyperlinks on the file column, with `%file%`, `%line%` and `%column%` placeholders. Null means no hyperlinks.
      */
     public function __construct(
         private bool $count = false,
+        private ?string $link_template = null,
     ) {}
 
     /**
@@ -37,7 +40,7 @@ final readonly class CSV implements OutputFormatter
         $lines[] = '"File","Line","Column","Tool","Fixable","Type","Message","Rule"'.($this->count ? ',"Count"' : '');
         foreach ($findings as $finding) {
             $fields = [
-                self::escapeField($finding->file),
+                self::escapeField(Hyperlink::wrap($this->link_template, $finding->file, $finding->file, $finding->line, $finding->column)),
                 (string) $finding->line,
                 (string) $finding->column,
                 self::escapeField($finding->tool),

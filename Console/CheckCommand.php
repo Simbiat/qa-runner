@@ -10,6 +10,7 @@ use Simbiat\QARunner\Formatters\Console;
 use Simbiat\QARunner\Formatters\CSV;
 use Simbiat\QARunner\Formatters\IDE;
 use Simbiat\QARunner\Formatters\TSV;
+use Simbiat\QARunner\Helpers\PathMap;
 use Simbiat\QARunner\Helpers\Paths;
 use Simbiat\QARunner\Helpers\Sorter;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
@@ -42,9 +43,11 @@ final class CheckCommand extends AbstractQACommand
     {
         parent::configure();
 
-        $this
+        (void) $this
             ->addOption('format', 'f', InputOption::VALUE_REQUIRED, 'Output format: '.\implode(' or ', self::FORMATS), 'ide', self::FORMATS)
             ->addOption('by-type', mode: InputOption::VALUE_NONE, description: 'Group findings by tool, type and rule instead of by file')
+            ->addOption('link', mode: InputOption::VALUE_REQUIRED, description: 'Make file paths OSC 8 hyperlinks. The value is a URL template with `%file%`, `%line%` and `%column%`, for example `phpstorm://open?file=%file%&line=%line%&column=%column%`. Escape sequences are added to the output of any format')
+            ->addOption('path-map', mode: InputOption::VALUE_REQUIRED | InputOption::VALUE_IS_ARRAY, description: 'Replace a path prefix in the output, as `from=to`, for example `/app=C:\projects\site`. Can be used several times. Affects the file paths and `--link`')
             ->addOption('fixable', mode: InputOption::VALUE_NONE, description: 'Show only the findings, that the tools can fix. Failures of the tools are still shown')
             ->addOption('count', mode: InputOption::VALUE_NONE, description: 'Add a `Count` column with the number of findings of the same rule (only for `csv` and `tsv` formats)')
             ->addOption('by-count', mode: InputOption::VALUE_NONE, description: 'Sort findings by `Count`, from the highest to the lowest. Implies `--count`')
@@ -81,7 +84,10 @@ final class CheckCommand extends AbstractQACommand
             $count = false;
         }
 
-        $formatter = self::formatter($format, $output->isDecorated(), $by_type, $count);
+        $link = self::linkTemplate($input);
+        $path_map = self::pathMap($input);
+
+        $formatter = self::formatter($format, $output->isDecorated(), $by_type, $count, $link);
 
         $result = new Check($adapters, $timeout)->run($paths);
 
@@ -93,6 +99,8 @@ final class CheckCommand extends AbstractQACommand
         foreach ($result->failures as $tool => $message) {
             $findings[] = new Finding(tool: $tool, rule: 'qa-runner-failure', file: $paths->first(), message: $message, type: 'ERROR');
         }
+
+        $findings = $path_map->applyToFindings($findings);
 
         $findings = match (true) {
             $by_count => Sorter::sortByCount($findings),
@@ -116,21 +124,69 @@ final class CheckCommand extends AbstractQACommand
     /**
      * Create the formatter by its name.
      *
-     * @param string $name    Formatter name
-     * @param bool   $colors  Whether the output supports colors
-     * @param bool   $by_type Whether findings are grouped by tool, type and rule
-     * @param bool   $count   Whether `csv` and `tsv` formats have the `Count` column
+     * @param string      $name    Formatter name
+     * @param bool        $colors  Whether the output supports colors
+     * @param bool        $by_type Whether findings are grouped by tool, type and rule
+     * @param bool        $count   Whether `csv` and `tsv` formats have the `Count` column
+     * @param string|null $link    URL template for OSC 8 hyperlinks
      *
      * @return OutputFormatter
      */
-    private static function formatter(string $name, bool $colors, bool $by_type, bool $count): OutputFormatter
+    private static function formatter(string $name, bool $colors, bool $by_type, bool $count, ?string $link = null): OutputFormatter
     {
         return match ($name) {
-            'ide' => new IDE(),
-            'csv' => new CSV($count),
-            'tsv' => new TSV($count),
-            'console' => new Console($colors, $by_type),
-            default => throw new InvalidOptionException("Unknown format '{$name}'. Available: ".\implode(', ', self::FORMATS)),
+            'ide' => new IDE($colors, $link),
+            'csv' => new CSV($count, $link),
+            'tsv' => new TSV($count, $link),
+            'console' => new Console($colors, $by_type, $link),
+            default => throw new InvalidOptionException("Unknown format '$name'. Available: ".\implode(', ', self::FORMATS)),
         };
+    }
+
+    /**
+     * Get the URL template from `--link` and validate it.
+     *
+     * @param InputInterface $input Input
+     *
+     * @return string|null Null if the option is not used
+     *
+     * @throws InvalidOptionException
+     */
+    private static function linkTemplate(InputInterface $input): ?string
+    {
+        $raw = $input->getOption('link');
+        if ($raw === null) {
+            return null;
+        }
+
+        if (
+            !\is_string($raw)
+            || !\str_contains($raw, '%file%')
+            || \preg_match('/[\x00-\x1F\x7F]/', $raw) === 1
+        ) {
+            throw new InvalidOptionException('Option `--link` needs a URL template with `%file%` and without control characters, for example `phpstorm://open?file=%file%&line=%line%&column=%column%`.');
+        }
+
+        return $raw;
+    }
+
+    /**
+     * Get the path map from `--path-map`.
+     *
+     * @param InputInterface $input Input
+     *
+     * @return PathMap
+     *
+     * @throws InvalidOptionException
+     */
+    private static function pathMap(InputInterface $input): PathMap
+    {
+        $raw = $input->getOption('path-map');
+
+        try {
+            return PathMap::fromOptions(\array_values(\array_filter(\is_array($raw) ? $raw : [], \is_string(...))));
+        } catch (\InvalidArgumentException $exception) {
+            throw new InvalidOptionException($exception->getMessage(), $exception->getCode(), previous: $exception);
+        }
     }
 }

@@ -6,6 +6,7 @@ namespace Simbiat\QARunner\Formatters;
 
 use Simbiat\QARunner\Entities\Finding;
 use Simbiat\QARunner\Entities\Severity;
+use Simbiat\QARunner\Helpers\Hyperlink;
 use Simbiat\QARunner\Interfaces\OutputFormatter;
 use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 
@@ -15,12 +16,14 @@ use Symfony\Component\Console\Formatter\OutputFormatterStyle;
 final readonly class Console implements OutputFormatter
 {
     /**
-     * @param bool $colors  Whether to color the output (pass `$output->isDecorated()`, so `--ansi`, `--no-ansi`, `NO_COLOR` and TTY detection work)
-     * @param bool $by_rule Whether grouping by tool, type and rule should be used (the findings must be sorted accordingly) instead of grouping by file
+     * @param bool        $colors        Whether to color the output (pass `$output->isDecorated()`, so `--ansi`, `--no-ansi`, `NO_COLOR` and TTY detection work)
+     * @param bool        $by_rule       Whether grouping by tool, type and rule should be used (the findings must be sorted accordingly) instead of grouping by file
+     * @param string|null $link_template URL template for OSC 8 hyperlinks on the file paths, for example `phpstorm://open?file=%file%&line=%line%&column=%column%`. Placeholders: `%file%`, `%line%`, `%column%`. Null means no hyperlinks. Use it only when the terminal supports escape sequences.
      */
     public function __construct(
-        private bool $colors = true,
-        private bool $by_rule = false,
+        private bool    $colors = true,
+        private bool    $by_rule = false,
+        private ?string $link_template = null,
     ) {}
 
     /**
@@ -50,7 +53,9 @@ final readonly class Console implements OutputFormatter
                 $notch_outer = $outer;
                 $notch_bucket = null;
                 $notch_rule = null;
-                $lines[] = $outer.':';
+                $lines[] = ($this->by_rule
+                        ? $outer
+                        : Hyperlink::wrap($this->link_template, $outer, $outer, 1, 1)).':';
             }
 
             if ($this->by_rule) {
@@ -66,12 +71,15 @@ final readonly class Console implements OutputFormatter
                     $lines[] = "\t\t".$notch_rule.':';
                 }
 
-                $lines[] = \sprintf("\t\t\t%s:%d:%d: %s", $finding->file, $finding->line, $finding->column, $finding->message);
+                $lines[] = \sprintf(
+                    "\t\t\t%s: %s",
+                    Hyperlink::wrap($this->link_template, \sprintf('%s:%d:%d', $finding->file, $finding->line, $finding->column), $finding->file, $finding->line, $finding->column),
+                    $finding->message,
+                );
             } else {
                 $lines[] = \sprintf(
-                    "\t%d:%d: %s %s (%s)",
-                    $finding->line,
-                    $finding->column,
+                    "\t%s: %s %s (%s)",
+                    Hyperlink::wrap($this->link_template, \sprintf('%d:%d', $finding->line, $finding->column), $finding->file, $finding->line, $finding->column),
                     $this->color(\sprintf('[%s, %s%s]', $finding->tool, $finding->fixable ? 'Fixable ' : '', $finding->type), $finding->type),
                     $finding->message,
                     $finding->rule,
