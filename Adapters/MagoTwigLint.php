@@ -45,7 +45,7 @@ final readonly class MagoTwigLint extends AbstractAdapter implements FixableTool
         // Enforce JSON format and dry-run, and remove `--fix`
         $command = Cli::strip(Cli::ensureFlag(Cli::setOption($this->command, '--reporting-format', 'json'), '--dry-run'), ['--fix']);
 
-        return $this->shell($command, $paths);
+        return $this->shell($command, $this->full_scan ? null : $paths);
     }
 
     /**
