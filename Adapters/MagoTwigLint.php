@@ -64,7 +64,7 @@ final readonly class MagoTwigLint extends AbstractAdapter implements FixableTool
         $this->assertMago();
 
         // Ensure we have a fix mode
-        $command = Cli::strip(Cli::ensureFlag($this->command, '--fix'), ['--dry-run']);
+        $command = Cli::strip(Cli::ensureFlag($this->command, '--fix'), ['--dry-run', '--reporting-format']);
 
         return $this->shell($command, $paths);
     }
